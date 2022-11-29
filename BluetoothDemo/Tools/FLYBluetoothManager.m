@@ -7,8 +7,7 @@
 //
 
 #import "FLYBluetoothManager.h"
-
-#define FLYLog(...) NSLog(__VA_ARGS__)
+#import "FLYConnectModel.h"
 
 @interface FLYBluetoothManager () < CBCentralManagerDelegate, CBPeripheralDelegate >
 
@@ -18,11 +17,8 @@
 //蓝牙状态
 @property (nonatomic, assign, readwrite) CBManagerState state;
 
-// 保存已连接的外设 (支持同时连接多个)
-@property (nonatomic, strong) NSMutableArray * peripherals;
-
-// 保存扫描并连接的name
-@property (nonatomic, strong) NSString * connectName;
+// 存放连接模型的数组  (因为支持同时连接多个外设，所以很多的连接数据都放到连接模型里了)
+@property (nonatomic, strong) NSMutableArray<FLYConnectModel *> * connectModels;
 
 @end
 
@@ -95,11 +91,6 @@
 
 
     self.state = central.state;
-
-    if ( [self.delegate respondsToSelector:@selector(bluetoothManager:didUpdateState:)] )
-    {
-        [self.delegate bluetoothManager:self didUpdateState:central.state];
-    }
 }
 
 /**
@@ -112,34 +103,44 @@
  */
 - (void)centralManager:(CBCentralManager *)central didDiscoverPeripheral:(CBPeripheral *)peripheral advertisementData:(NSDictionary<NSString *,id> *)advertisementData RSSI:(NSNumber *)RSSI
 {
-    //FLYLog(@"扫描到外设：%@", peripheral);
+    //NSLog(@"扫描到外设：%@", peripheral);
     
-    
-    // 是否有扫描并连接的name
-    if ( self.connectName != nil )
+    for ( FLYConnectModel * connectModel in self.connectModels)
     {
-        //如果需要连接的name等于外围设备name，则停止扫描并连接
-        if ( [peripheral.name isEqualToString:self.connectName] )
+        // 是否有扫描并连接的name
+        if ( connectModel.connectName )
         {
-            [self stopScan];
-            [self connectPeripheral:peripheral];
-        }
-        else
-        {
-            //遍历广播字典里的所有value，如果能和传进来的name匹配，则停止扫描并连接 (因为传进来的可能是mac，在广播里找找)
-            for (id value in advertisementData.allValues)
+            //如果需要连接的name等于外围设备name，则停止扫描并连接
+            if ( [peripheral.name isEqualToString:connectModel.connectName] )
             {
-                if ( [value isKindOfClass:[NSString class]] )
+                connectModel.peripheral = peripheral;
+                
+                [self stopScan];
+                [self connectPeripheral:peripheral];
+            }
+            else
+            {
+                //遍历广播字典里的所有value，如果能和传进来的name匹配，则停止扫描并连接 (因为传进来的可能是mac，在广播里找找)
+                for (id value in advertisementData.allValues)
                 {
-                    if ( [value isEqualToString:self.connectName] )
+                    if ( [value isKindOfClass:[NSString class]] )
                     {
-                        [self stopScan];
-                        [self connectPeripheral:peripheral];
+                        if ( [value isEqualToString:connectModel.connectName] )
+                        {
+                            // 保存广播里的这个值
+                            connectModel.subName = value;
+                            connectModel.peripheral = peripheral;
+                            
+                            [self stopScan];
+                            [self connectPeripheral:peripheral];
+                            break;
+                        }
                     }
                 }
             }
         }
     }
+   
     
     
     if ( [self.delegate respondsToSelector:@selector(bluetoothManager:didDiscoverPeripheral:advertisementData:RSSI:)] )
@@ -156,7 +157,21 @@
  */
 - (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)peripheral
 {
-    FLYLog(@"连接外设成功：%@", peripheral);
+    NSLog(@"连接外设成功：%@", peripheral);
+    
+    for ( FLYConnectModel * connectModel in self.connectModels )
+    {
+        if ( connectModel.peripheral == peripheral )
+        {
+            // 连接成功之后，不要马上执行连接成功的回调，等个0.5秒，给扫描服务和扫描特征留点时间，扫描完毕之后再执行回调，保证外界在这个block里可以直接执行其他的蓝牙操作(扫描服务和扫描特征没完成的话，不能执行其他的蓝牙操作)
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                
+                // 执行连接成功的回调
+                !connectModel.connectSuccessBlock ?: connectModel.connectSuccessBlock(peripheral);
+            });
+        }
+    }
+    
     
     if ( [self.delegate respondsToSelector:@selector(bluetoothManager:didConnectPeripheral:)] )
     {
@@ -175,9 +190,19 @@
 //连接外设失败
 - (void)centralManager:(CBCentralManager *)central didFailToConnectPeripheral:(CBPeripheral *)peripheral error:(nullable NSError *)error
 {
-    FLYLog(@"连接外设失败：%@, error：%@", peripheral, error);
+    NSLog(@"连接外设失败：%@, error：%@", peripheral, error);
     
-    [self.peripherals removeObject:peripheral];
+    [self.connectModels enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(FLYConnectModel * _Nonnull connectModel, NSUInteger idx, BOOL * _Nonnull stop) {
+        
+        if ( connectModel.peripheral == peripheral )
+        {
+            // 执行连接失败的回调
+            !connectModel.connectFailureBlock ?: connectModel.connectFailureBlock(error);
+            
+            // 移除
+            [self.connectModels removeObject:connectModel];
+        }
+    }];
 }
 
 //断开外设连接
@@ -185,16 +210,22 @@
 {
     if ( error )
     {
-        FLYLog(@"外设连接意外断开：%@", peripheral);
-        FLYLog(@"意外断开原因：%@", error);
+        NSLog(@"外设连接意外断开：%@", peripheral);
+        NSLog(@"意外断开原因：%@", error);
     }
     else
     {
-        FLYLog(@"外设连接断开成功：%@", peripheral);
+        NSLog(@"外设连接断开成功：%@", peripheral);
     }
     
     
-    [self.peripherals removeObject:peripheral];
+    [self.connectModels enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(FLYConnectModel * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        
+        if ( obj.peripheral == peripheral )
+        {
+            [self.connectModels removeObject:obj];
+        }
+    }];
     
     if ( [self.delegate respondsToSelector:@selector(bluetoothManager:didDisconnectPeripheral:error:)] )
     {
@@ -206,17 +237,12 @@
 
 #pragma mark - CBPeripheralDelegate 外设代理
 
-//当发现服务时调用
+// 扫描到外设的服务时回调 (即使有多个服务，也只会回调一次，拿到的是数组，所有的服务都在里面)
 - (void)peripheral:(CBPeripheral *)peripheral didDiscoverServices:(NSError *)error
 {
     for (CBService * service in peripheral.services )
     {
-        FLYLog(@"发现服务：%@", service);
-        
-        if ( [self.delegate respondsToSelector:@selector(peripheral:didDiscoverServices:)] )
-        {
-            [self.delegate peripheral:peripheral didDiscoverServices:error];
-        }
+        NSLog(@"发现服务：%@", service);
         
         //扫描特征
         [peripheral discoverCharacteristics:nil forService:service];
@@ -225,23 +251,30 @@
 //        CBUUID * UUID = [CBUUID UUIDWithString:characteristicUUID];
 //        [self.peripheral discoverCharacteristics:@[UUID] forService:service];
     }
+    
+    
+//    if ( [self.delegate respondsToSelector:@selector(peripheral:didDiscoverServices:)] )
+//    {
+//        [self.delegate peripheral:peripheral didDiscoverServices:error];
+//    }
 }
 
-//当发现特征时调用
+// 扫描到服务的特征时回调  (一个服务只会回调一次，拿到的是数组，该服务的所有特征都在里面)
 - (void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(NSError *)error
 {
     for (CBCharacteristic * characteristic in service.characteristics )
     {
-        FLYLog(@"发现特征：%@", characteristic);
+        NSLog(@"发现 %@ 服务的特征：%@", service.UUID.UUIDString, characteristic);
         
         // 订阅, 实时接收 (在didUpdateValueForCharacteristic里返回)
         [peripheral setNotifyValue:YES forCharacteristic:characteristic];
-        
-        if ( [self.delegate respondsToSelector:@selector(peripheral:didDiscoverCharacteristicsForService:error:)] )
-        {
-            [self.delegate peripheral:peripheral didDiscoverCharacteristicsForService:service error:error];
-        }
     }
+    
+    
+//    if ( [self.delegate respondsToSelector:@selector(peripheral:didDiscoverCharacteristicsForService:error:)] )
+//    {
+//        [self.delegate peripheral:peripheral didDiscoverCharacteristicsForService:service error:error];
+//    }
 }
 
 //执行readValueForCharacteristic:(读取特征数据)时会调用此代理
@@ -249,11 +282,11 @@
 {
     if ( error )
     {
-        FLYLog(@"读取失败：%@", error);
+        NSLog(@"读取失败：%@", error);
     }
     else
     {
-        FLYLog(@"读取成功：%@", characteristic.value);
+        NSLog(@"读取成功：%@", characteristic.value);
     }
     
     
@@ -269,11 +302,11 @@
 {
     if ( error )
     {
-        FLYLog(@"写入失败：%@", error);
+        NSLog(@"写入失败：%@", error);
     }
     else
     {
-        FLYLog(@"写入成功");
+        NSLog(@"写入成功");
     }
     
     
@@ -288,21 +321,41 @@
 #pragma mark - public methods
 
 /// 扫描并连接设备 (连接成功后自动停止扫描)
-/// - Parameter name: 需要连接的 设备名字 或 Mac地址 (如果是用Mac，需要蓝牙设备把Mac地址放到广播中)
-- (void)scanAndConnect:(NSString *)name
+/// - Parameters:
+///   - name: 需要连接的 设备名字 或 Mac地址 (如果是用Mac，需要蓝牙设备把Mac地址放到广播中)
+///   - successBlock: 连接成功的回调
+///   - failureBlock: 连接失败的回调  (搜索不到不会执行连接失败的回调)
+- (void)scanAndConnect:(NSString *)name success:(nullable void(^)(CBPeripheral *))successBlock failure:(nullable void(^)(NSError *))failureBlock
 {
-    self.connectName = name;
+    // 是否已经连接
+    for ( FLYConnectModel *connectModel in self.connectModels )
+    {
+        // 如果已经连接了，直接返回成功回调，然后retun
+        if ( [connectModel.peripheral.name isEqualToString:name] || [connectModel.subName isEqualToString:name]  )
+        {
+            if ( connectModel.peripheral.state == CBPeripheralStateConnected )
+            {
+                successBlock(connectModel.peripheral);
+                return;
+            }
+        }
+    }
     
-    //扫描周边设备 
+    
+
+    FLYConnectModel * connectModel = [[FLYConnectModel alloc] init];
+    connectModel.connectName = name;
+    connectModel.connectSuccessBlock = successBlock;
+    connectModel.connectFailureBlock = failureBlock;
+    [self.connectModels addObject:connectModel];
+    
+    //扫描周边设备
     [self.centralManager scanForPeripheralsWithServices:nil options:nil];
 }
 
 /// 开始扫描周边设备
 - (void)startScan
-{
-    //清空扫描后自动连接的设备name (以防上次调用了scanAndConnect:方法)
-    self.connectName = nil;
-    
+{    
     //扫描周边设备 (Services:是服务的UUID，而且是一个数组。如果不传，默认扫描所有服务)
     [self.centralManager scanForPeripheralsWithServices:nil options:nil];
 }
@@ -313,13 +366,49 @@
     [self.centralManager stopScan];
 }
 
+/// 连接外围设备 (连接成功后自动停止扫描)
+/// - Parameters:
+///   - peripheral: 外设对象
+///   - successBlock: 连接成功的回调
+///   - failureBlock: 连接失败的回调
+- (void)connectPeripheral:(CBPeripheral *)peripheral success:(nullable void(^)(CBPeripheral * peripheral))successBlock failure:(nullable void(^)(NSError * error))failureBlock
+{
+    
+    /*
+      disconnected 外围设备没有连接到中央经理
+     
+      connecting 外围设备正在连接到中央经理
+     
+      connected 外围设备已连接到中央经理
+     
+      disconnecting 外围设备正在与中央经理断开连接
+     */
+    
+    
+    // 如果已经连接了，直接返回成功回调，然后retun
+    if ( peripheral.state == CBPeripheralStateConnected )
+    {
+        successBlock(peripheral);
+        return;
+    }
+    
+    
+    
+    FLYConnectModel * connectModel = [[FLYConnectModel alloc] init];
+    // peripheral必须保存起来才能连接，不然会被释放。
+    connectModel.peripheral = peripheral;
+    connectModel.connectSuccessBlock = successBlock;
+    connectModel.connectFailureBlock = failureBlock;
+    [self.connectModels addObject:connectModel];
+    
+    
+    [self connectPeripheral:peripheral];
+    
+}
+
 /// 连接外围设备
-/// - Parameter peripheral: 设备对象
 - (void)connectPeripheral:(CBPeripheral *)peripheral
 {
-    //必须保存起来才能连接，不然会被释放。
-    [self.peripherals addObject:peripheral];
-    
     //连接外围设备
     [self.centralManager connectPeripheral:peripheral options:nil];
     
@@ -334,7 +423,7 @@
     //FLYBluetoothManager支持同时连接多个蓝牙设备，可以指定断开某个设备。如果传nil，则断开的是最后一个连接的蓝牙设备
     if ( peripheral == nil )
     {
-        peripheral = self.peripherals.lastObject;
+        peripheral = self.connectModels.lastObject.peripheral;
     }
     
     [self.centralManager cancelPeripheralConnection:peripheral];
@@ -349,7 +438,7 @@
 {
     if ( peripheral == nil )
     {
-        peripheral = self.peripherals.lastObject;
+        peripheral = self.connectModels.lastObject.peripheral;
     }
     
     // 是否找到特征
@@ -370,7 +459,7 @@
     
     if ( isFindCharacteristic == NO )
     {
-        FLYLog(@"读取数据失败，未找到 %@ 特征", characteristicUUID);
+        NSLog(@"读取数据失败，未找到 %@ 特征", characteristicUUID);
     }
     
 }
@@ -384,7 +473,7 @@
 {
     if ( peripheral == nil )
     {
-        peripheral = self.peripherals.lastObject;
+        peripheral = self.connectModels.lastObject.peripheral;
     }
     
     // 是否找到特征
@@ -405,7 +494,7 @@
     
     if ( isFindCharacteristic == NO )
     {
-        FLYLog(@"写入数据失败，未找到 %@ 特征", characteristicUUID);
+        NSLog(@"写入数据失败，未找到 %@ 特征", characteristicUUID);
     }
 }
 
@@ -478,13 +567,13 @@
 
 #pragma mark - setters and getters
 
-- (NSMutableArray *)peripherals
+-(NSMutableArray<FLYConnectModel *> *)connectModels
 {
-    if ( _peripherals == nil )
+    if ( _connectModels == nil )
     {
-        _peripherals = [NSMutableArray array];
+        _connectModels = [NSMutableArray array];
     }
-    return _peripherals;
+    return _connectModels;
 }
 
 

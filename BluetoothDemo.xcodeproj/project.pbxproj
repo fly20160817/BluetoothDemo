@@ -16,6 +16,9 @@
 		04286D6429023DF800DEEEB2 /* FLYBluetoothManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 04286D6329023DF700DEEEB2 /* FLYBluetoothManager.m */; };
 		04286D6929023E1800DEEEB2 /* ListViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 04286D6629023E1800DEEEB2 /* ListViewController.m */; };
 		04286D6A29023E1800DEEEB2 /* ConnectViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 04286D6829023E1800DEEEB2 /* ConnectViewController.m */; };
+		0461E631290A85AB00C3BDB5 /* FLYBluetoothHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = 0461E630290A85AB00C3BDB5 /* FLYBluetoothHandler.m */; };
+		046950312935F5A3009446F3 /* WorkViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 046950302935F5A3009446F3 /* WorkViewController.m */; };
+		0495F602291B883B00722640 /* FLYConnectModel.m in Sources */ = {isa = PBXBuildFile; fileRef = 0495F601291B883B00722640 /* FLYConnectModel.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +38,12 @@
 		04286D6629023E1800DEEEB2 /* ListViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ListViewController.m; sourceTree = "<group>"; };
 		04286D6729023E1800DEEEB2 /* ConnectViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConnectViewController.h; sourceTree = "<group>"; };
 		04286D6829023E1800DEEEB2 /* ConnectViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ConnectViewController.m; sourceTree = "<group>"; };
+		0461E62F290A85AB00C3BDB5 /* FLYBluetoothHandler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FLYBluetoothHandler.h; sourceTree = "<group>"; };
+		0461E630290A85AB00C3BDB5 /* FLYBluetoothHandler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FLYBluetoothHandler.m; sourceTree = "<group>"; };
+		0469502F2935F5A3009446F3 /* WorkViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WorkViewController.h; sourceTree = "<group>"; };
+		046950302935F5A3009446F3 /* WorkViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WorkViewController.m; sourceTree = "<group>"; };
+		0495F600291B883B00722640 /* FLYConnectModel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FLYConnectModel.h; sourceTree = "<group>"; };
+		0495F601291B883B00722640 /* FLYConnectModel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FLYConnectModel.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +76,8 @@
 		04286D4729023DBA00DEEEB2 /* BluetoothDemo */ = {
 			isa = PBXGroup;
 			children = (
+				0461E62F290A85AB00C3BDB5 /* FLYBluetoothHandler.h */,
+				0461E630290A85AB00C3BDB5 /* FLYBluetoothHandler.m */,
 				04286D6129023DD200DEEEB2 /* Tools */,
 				04286D4829023DBA00DEEEB2 /* AppDelegate.h */,
 				04286D4929023DBA00DEEEB2 /* AppDelegate.m */,
@@ -74,6 +85,8 @@
 				04286D4C29023DBA00DEEEB2 /* SceneDelegate.m */,
 				04286D6729023E1800DEEEB2 /* ConnectViewController.h */,
 				04286D6829023E1800DEEEB2 /* ConnectViewController.m */,
+				0469502F2935F5A3009446F3 /* WorkViewController.h */,
+				046950302935F5A3009446F3 /* WorkViewController.m */,
 				04286D6529023E1700DEEEB2 /* ListViewController.h */,
 				04286D6629023E1800DEEEB2 /* ListViewController.m */,
 				04286D5129023DBA00DEEEB2 /* Main.storyboard */,
@@ -90,6 +103,8 @@
 			children = (
 				04286D6229023DF600DEEEB2 /* FLYBluetoothManager.h */,
 				04286D6329023DF700DEEEB2 /* FLYBluetoothManager.m */,
+				0495F600291B883B00722640 /* FLYConnectModel.h */,
+				0495F601291B883B00722640 /* FLYConnectModel.m */,
 			);
 			path = Tools;
 			sourceTree = "<group>";
@@ -166,10 +181,13 @@
 			files = (
 				04286D6929023E1800DEEEB2 /* ListViewController.m in Sources */,
 				04286D6A29023E1800DEEEB2 /* ConnectViewController.m in Sources */,
+				0495F602291B883B00722640 /* FLYConnectModel.m in Sources */,
+				0461E631290A85AB00C3BDB5 /* FLYBluetoothHandler.m in Sources */,
 				04286D4A29023DBA00DEEEB2 /* AppDelegate.m in Sources */,
 				04286D5B29023DC000DEEEB2 /* main.m in Sources */,
 				04286D4D29023DBA00DEEEB2 /* SceneDelegate.m in Sources */,
 				04286D6429023DF800DEEEB2 /* FLYBluetoothManager.m in Sources */,
+				046950312935F5A3009446F3 /* WorkViewController.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

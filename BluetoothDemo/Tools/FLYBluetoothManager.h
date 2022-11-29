@@ -18,9 +18,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @optional
 
-/** 蓝牙状态改变了 */
-- (void)bluetoothManager:(FLYBluetoothManager *)manager didUpdateState:(CBManagerState)state;
-
 /** 扫描到外围设备 */
 - (void)bluetoothManager:(FLYBluetoothManager *)manager didDiscoverPeripheral:(CBPeripheral *)peripheral advertisementData:(NSDictionary<NSString *,id> *)advertisementData RSSI:(NSNumber *)RSSI;
 
@@ -32,11 +29,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 
 
-/** 扫描到服务时的回调 */
--(void)peripheral:(CBPeripheral *)peripheral didDiscoverServices:(NSError *)error;
-
-/** 扫描到特征时的回调 */
--(void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(NSError *)error;
+///** 扫描到服务时的回调 */
+//-(void)peripheral:(CBPeripheral *)peripheral didDiscoverServices:(NSError *)error;
+//
+///** 扫描到特征时的回调 */
+//-(void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(NSError *)error;
 
 /** 读取数据后的回调 */
 -(void)peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error;
@@ -57,8 +54,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 
 /// 扫描并连接设备 (连接成功后自动停止扫描)
-/// - Parameter name: 需要连接的 设备名字 或 Mac地址 (如果是用Mac，需要蓝牙设备把Mac地址放到广播中)
-- (void)scanAndConnect:(NSString *)name;
+/// - Parameters:
+///   - name: 需要连接的 设备名字 或 Mac地址 (如果是用Mac，需要蓝牙设备把Mac地址放到广播中)
+///   - successBlock: 连接成功的回调
+///   - failureBlock: 连接失败的回调  (搜索不到不会执行连接失败的回调)
+- (void)scanAndConnect:(NSString *)name success:(nullable void(^)(CBPeripheral * peripheral))successBlock failure:(nullable void(^)(NSError * error))failureBlock;
+
 
 /// 开始扫描周边设备
 - (void)startScan;
@@ -66,10 +67,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// 停止扫描周边设备
 - (void)stopScan;
 
-
-/// 连接外围设备
-/// - Parameter peripheral: 设备对象
-- (void)connectPeripheral:(CBPeripheral *)peripheral;
+/// 连接外围设备 (连接成功后自动停止扫描)
+/// - Parameters:
+///   - peripheral: 外设对象
+///   - successBlock: 连接成功的回调
+///   - failureBlock: 连接失败的回调
+- (void)connectPeripheral:(CBPeripheral *)peripheral success:(nullable void(^)(CBPeripheral * peripheral))successBlock failure:(nullable void(^)(NSError * error))failureBlock;
 
 /// 断开外围设备
 /// - Parameter peripheral: 设备对象  (FLYBluetoothManager支持同时连接多个蓝牙设备，可以指定断开某个设备。如果传nil，则断开的是最后一个连接的蓝牙设备)
@@ -78,16 +81,17 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 读取数据
 /// - Parameters:
-///   - peripheral: 外设 
+///   - peripheral: 外设  (FLYBluetoothManager支持同时连接多个蓝牙设备，可以指定读取某个设备。如果传nil，则读取的是最后一个连接的蓝牙设备)
 ///   - characteristicUUID: 特征的UUID
 - (void)readDataWithPeripheral:(nullable CBPeripheral *)peripheral characteristicUUID:(NSString *)characteristicUUID;
 
 /// 写入数据
 /// - Parameters:
 ///   - data: 数据
-///   - peripheral: 外设
+///   - peripheral: 外设 (FLYBluetoothManager支持同时连接多个蓝牙设备，可以指定写入某个设备。如果传nil，则写入的是最后一个连接的蓝牙设备)
 ///   - characteristicUUID: 特征的UUID
 - (void)writeData:(NSData *)data peripheral:(nullable CBPeripheral *)peripheral characteristicUUID:(NSString *)characteristicUUID;
+
 
 
 /// 16进制字符串 转 Data

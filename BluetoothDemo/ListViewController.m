@@ -5,8 +5,9 @@
 //  Created by fly on 2022/10/20.
 //
 
-
-// 扫描附近蓝牙，展示在页面上，需要连接哪个，点击链接即可。 设置代理，需要用到哪些代理就写哪些。
+/*
+    扫描附近蓝牙，展示在页面上，需要连接哪个，点击链接即可。
+ */
 
 
 #import "ListViewController.h"
@@ -79,7 +80,16 @@
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     
     CBPeripheral * peripheral = self.peripheralArray[indexPath.row];
-    [[FLYBluetoothManager sharedManager] connectPeripheral:peripheral];
+    
+    [[FLYBluetoothManager sharedManager] connectPeripheral:peripheral success:^(CBPeripheral * _Nonnull peripheral) {
+        
+        NSLog(@"连接成功");
+        
+    } failure:^(NSError * _Nonnull error) {
+        
+        NSLog(@"连接失败：%@", error);
+        
+    }];
 }
 
 

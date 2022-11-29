@@ -19,7 +19,8 @@
                     </tabBar>
                     <connections>
                         <segue destination="SbR-9a-gbS" kind="relationship" relationship="viewControllers" id="BPJ-0g-19f"/>
-                        <segue destination="5VE-Mp-2rI" kind="relationship" relationship="viewControllers" id="DwE-tY-oU6"/>
+                        <segue destination="6ak-AT-bV9" kind="relationship" relationship="viewControllers" id="RX5-Ha-tu7"/>
+                        <segue destination="5VE-Mp-2rI" kind="relationship" relationship="viewControllers" id="w9Q-6K-oWg"/>
                     </connections>
                 </tabBarController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="cor-ku-hV1" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
@@ -53,7 +54,7 @@
                 </tableViewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="5cx-0C-Vps" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-275" y="48"/>
+            <point key="canvasLocation" x="-275" y="379"/>
         </scene>
         <!--扫描并连接-->
         <scene sceneID="j5v-ob-Mjk">
@@ -101,12 +102,41 @@
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="kPE-0l-8yL" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-275.38461538461536" y="-691.70616113744074"/>
+            <point key="canvasLocation" x="-275" y="-1015"/>
+        </scene>
+        <!--业务封装-->
+        <scene sceneID="Zzx-4d-XuQ">
+            <objects>
+                <viewController id="6ak-AT-bV9" customClass="WorkViewController" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="QfB-2n-7uX">
+                        <rect key="frame" x="0.0" y="0.0" width="390" height="844"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="clP-vU-A3h">
+                                <rect key="frame" x="166" y="405" width="59" height="35"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" systemColor="opaqueSeparatorColor"/>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="plain" title="开锁"/>
+                                <connections>
+                                    <action selector="openLockClick:" destination="6ak-AT-bV9" eventType="touchUpInside" id="b2V-XI-Tmp"/>
+                                </connections>
+                            </button>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="ynE-Ii-IPY"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                    </view>
+                    <tabBarItem key="tabBarItem" title="业务封装" image="paperplane.fill" catalog="system" id="9QI-2T-kqB"/>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="vf7-gC-LAB" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-275" y="-316"/>
         </scene>
     </scenes>
     <resources>
         <image name="app.connected.to.app.below.fill" catalog="system" width="117" height="128"/>
         <image name="list.bullet" catalog="system" width="128" height="87"/>
+        <image name="paperplane.fill" catalog="system" width="128" height="119"/>
         <systemColor name="opaqueSeparatorColor">
             <color red="0.77647058823529413" green="0.77647058823529413" blue="0.78431372549019607" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </systemColor>
