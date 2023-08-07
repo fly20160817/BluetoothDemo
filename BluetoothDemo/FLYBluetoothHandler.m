@@ -1,20 +1,51 @@
 //
 //  FLYBluetoothHandler.m
-//  BluetoothDemo
+//  FLYKit
 //
-//  Created by fly on 2022/10/27.
+//  Created by fly on 2023/7/25.
 //
 
 #import "FLYBluetoothHandler.h"
-#import "FLYBluetoothManager.h"
+#import "UIAlertController+FLYExtension.h"
+
+const NSErrorDomain domain1 = @"蓝牙未打开";
+const NSErrorDomain domain2 = @"蓝牙权限被禁";
+const NSErrorDomain domain3 = @"蓝牙硬件损坏";
+const NSErrorDomain domain4 = @"扫描外设超时 (没扫描到)";
+const NSErrorDomain domain5 = @"连接外设失败";
+const NSErrorDomain domain6 = @"意外断开连接";
+const NSErrorDomain domain7 = @"写入数据报错";
+const NSErrorDomain domain8 = @"读取数据报错";
+
+
+@interface FLYCommand : NSObject
+
+typedef NS_ENUM(NSInteger, FLYCommandType) {
+    FLYCommandTypeRead = 1,    //读
+    FLYCommandTypeWrite = 2,   //写
+};
+
+@property (nonatomic, strong) NSString * characteristicUUID;
+@property (nonatomic, assign) FLYCommandType commandType;
+@property (nonatomic, strong) NSData * data;
+
+@end
+
+@implementation FLYCommand
+@end
+
+
 
 @interface FLYBluetoothHandler () < FLYBluetoothManagerDelegate >
 
-@property (nonatomic, strong) NSString * lockId;
-@property (nonatomic, assign) FLYLockType lockType;
-@property (nonatomic, strong) NSDictionary * params;
-@property (nonatomic, copy) SuccessBlock successBlock;
-@property (nonatomic, copy) FailureBlock failureBlock;
+@property (nonatomic, copy) SuccessBlock success;
+@property (nonatomic, copy) FailureBlock failure;
+@property (nonatomic, copy) ProgressBlock progress;
+@property (nonatomic, copy) UpdateValueBlock updateValue;
+
+@property (nonatomic, strong) NSString * deviceName;
+// 存放待执行的蓝牙命令 (外界传命令进来的时候，蓝牙可能还没连接，所以先把蓝牙命令保存，等连接后在执行命令。)
+@property (nonatomic, strong) FLYCommand * command;
 
 @end
 
@@ -37,139 +68,345 @@
 {
     self = [super init];
     if (self) {
+        [[FLYBluetoothManager sharedManager] addDelegate:self];
+        [FLYBluetoothManager sharedManager].reconnect = YES;
         
-        [FLYBluetoothManager sharedManager].delegate = self;
-        
+        self.showAlert = YES;
     }
     return self;
 }
 
 
-
-#pragma mark - public methods
-
-- (void)openLock:(NSString *)lockId lockType:(FLYLockType)lockType params:(nullable NSDictionary *)params success:(SuccessBlock)success failure:(FailureBlock)failure
+/// 往特征里写入数据
+- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(SuccessBlock)success failure:(FailureBlock)failure progress:(ProgressBlock)progress
 {
-    self.lockId = lockId;
-    self.lockType = lockType;
-    self.params = params;
-    self.successBlock = success;
-    self.failureBlock = failure;
+    self.deviceName = name;
+    self.success = success;
+    self.failure = failure;
+    self.progress = progress;
     
     
-    [[FLYBluetoothManager sharedManager] scanAndConnect:lockId success:^(CBPeripheral * peripheral) {
-        
-        NSData * data = [self getOpenLockCommand];
-        
-        [[FLYBluetoothManager sharedManager] writeData:data peripheral:nil characteristicUUID:@"FF01"];
-        
-    } failure:^(NSError * error) {
-        
-        self.failureBlock(self.lockId, error);
-    }];
+    // 如果蓝牙状态不是打开的，手动调一下蓝牙状态的代理，代理里会处理各种状态
+    if ( [FLYBluetoothManager sharedManager].state != CBManagerStatePoweredOn && [FLYBluetoothManager sharedManager].state != CBManagerStateUnknown )
+    {
+        [self bluetoothManagerDidUpdateState:[FLYBluetoothManager sharedManager].state];
+        return;
+    }
+    
+    
+    //判断传进来的设备，是否已连接
+    if ( [[FLYBluetoothManager sharedManager] isConnected:name] )
+    {
+        [[FLYBluetoothManager sharedManager] writeWithDeviceName:name data:data characteristicUUID:characteristicUUID];
+        return;
+    }
+    
+    
+    !self.progress ?: self.progress(FLYBluetoothProgressScanning);
+    [[FLYBluetoothManager sharedManager] scanAndConnect:name timeout:60];
+    
+    // 保存蓝牙指定 (等连接成功之后执行)
+    FLYCommand * command = [[FLYCommand alloc] init];
+    command.characteristicUUID = characteristicUUID;
+    command.data = data;
+    command.commandType = FLYCommandTypeWrite;
+    self.command = command;
+}
 
-   
+
+/// 读取特征的值
+- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(SuccessBlock)success failure:(FailureBlock)failure progress:(ProgressBlock)progress
+{
+    self.deviceName = name;
+    self.success = success;
+    self.failure = failure;
+    self.progress = progress;
+    
+    // 如果蓝牙状态不是打开的，手动调一下蓝牙状态的代理，代理里会处理各种状态
+    if ( [FLYBluetoothManager sharedManager].state != CBManagerStatePoweredOn && [FLYBluetoothManager sharedManager].state != CBManagerStateUnknown )
+    {
+        [self bluetoothManagerDidUpdateState:[FLYBluetoothManager sharedManager].state];
+        return;
+    }
+    
+    
+    //判断传进来的设备，是否已连接
+    if ( [[FLYBluetoothManager sharedManager] isConnected:name] )
+    {
+        [[FLYBluetoothManager sharedManager] readWithDeviceName:name characteristicUUID:characteristicUUID];
+        return;
+    }
+    
+    
+    !self.progress ?: self.progress(FLYBluetoothProgressScanning);
+    [[FLYBluetoothManager sharedManager] scanAndConnect:name timeout:60];
+    
+    // 保存蓝牙指定 (等连接成功之后执行)
+    FLYCommand * command = [[FLYCommand alloc] init];
+    command.characteristicUUID = characteristicUUID;
+    command.commandType = FLYCommandTypeRead;
+    self.command = command;
+}
+
+
+/// 特征里的值更新时回调
+- (void)bluetoothDidUpdateValueForCharacteristic:(UpdateValueBlock)updateValue
+{
+    self.updateValue = updateValue;
 }
 
 
 
 #pragma mark - FLYBluetoothManagerDelegate
 
--(void)peripheral:(CBPeripheral *)peripheral didWriteValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error
+//判断设备的更新状态
+- (void)bluetoothManagerDidUpdateState:(CBManagerState)state
 {
-    if ( error )
+    switch (state)
     {
-        self.failureBlock(self.lockId, error);
+        case CBManagerStateUnknown:
+            break;
+            
+        case CBManagerStateResetting:
+            break;
+            
+        case CBManagerStateUnsupported:
+        {
+            if ( self.isShowAlert )
+            {
+                UIAlertController * alertController = [UIAlertController alertControllerWithTitle:@"提示" message:@"您的设备无法使用蓝牙功能" preferredStyle:UIAlertControllerStyleAlert titles:@[@"确定"] alertAction:^(NSInteger index) {}];
+                [alertController show];
+            }
+            
+            
+            NSError * error = [NSError errorWithDomain:domain3 code:FLYBluetoothErrorCodeUnsupported userInfo:nil];
+            !self.failure ?: self.failure(error);
+            [self reset];
+        }
+            break;
+            
+        case CBManagerStateUnauthorized:
+        {
+            if ( self.isShowAlert )
+            {
+                UIAlertController * alertController = [UIAlertController alertControllerWithTitle:@"提示" message:@"您已关闭蓝牙权限，请打开蓝牙权限" preferredStyle:UIAlertControllerStyleAlert titles:@[@"取消", @"去打开"] alertAction:^(NSInteger index) {
+                    if ( index == 1 )
+                    {
+                        NSURL *settingsURL = [NSURL URLWithString:UIApplicationOpenSettingsURLString];
+                        [[UIApplication sharedApplication] openURL:settingsURL options:@{} completionHandler:nil];
+                    }
+                }];
+                [alertController show];
+            }
+            
+            NSError * error = [NSError errorWithDomain:domain2 code:FLYBluetoothErrorCodeUnauthorized userInfo:nil];
+            !self.failure ?: self.failure(error);
+            [self reset];
+        }
+            break;
+            
+        case CBManagerStatePoweredOff:
+        {
+            if ( self.isShowAlert )
+            {
+                UIAlertController * alertController = [UIAlertController alertControllerWithTitle:@"蓝牙已关闭" message:@"请前往设置中开启蓝牙" preferredStyle:UIAlertControllerStyleAlert titles:@[@"确定"] alertAction:^(NSInteger index) {}];
+                [alertController show];
+            }
+            
+            NSError * error = [NSError errorWithDomain:domain1 code:FLYBluetoothErrorCodePoweredOff userInfo:nil];
+            !self.failure ?: self.failure(error);
+            [self reset];
+        }
+            break;
+            
+        case CBManagerStatePoweredOn:
+            break;
+            
+        default:
+            break;
     }
 }
 
--(void)peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error
+// 连接外设中
+-(void)bluetoothManager:(FLYBluetoothManager *)manager connectingPeripheral:(CBPeripheral *)peripheral
 {
-    if ( error )
+    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
     {
         return;
     }
     
-    NSString * hexString = [FLYBluetoothManager convertDataToHexString:characteristic.value];
     
-    
-    // 不同锁、不同操作返回的长度可能不同
-    if ( hexString.length == 4 )
+    !self.progress ?: self.progress(FLYBluetoothProgressConnecting);
+}
+
+// 连接到外设后调用
+-(void)bluetoothManager:(FLYBluetoothManager *)manager didConnectPeripheral:(CBPeripheral *)peripheral
+{
+    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
     {
-        NSString * code  = [hexString substringToIndex:2];
-        NSString * state = [hexString substringWithRange:NSMakeRange(2, 2)];
-        
-        //OTG开锁   3401 34代表开锁，01代表成功，非01都是失败
-        if ( code.intValue == 34 )
-        {
-            // 开锁成功
-            if ( state.intValue == 01 )
-            {
-                // 请求接口，上报开锁记录
-                //[self uploadUnlockRecordNetwork:self.params];
-                
-                self.successBlock(self.lockId);
-            }
-            // 开锁失败
-            else
-            {
-                self.failureBlock(self.lockId, nil);
-            }
-        }
-        //OTG关锁   4101 41代表开锁，01代表成功，非01都是失败
-        else if ( code.intValue == 41 )
-        {
-            
-        }
-        
+        return;
     }
-    // 不同锁、不同操作返回的长度可能不同
-    else if ( hexString.length == 6 )
+    
+    !self.progress ?: self.progress(FLYBluetoothProgressConnected);
+}
+
+// 连接外设失败
+- (void)bluetoothManager:(FLYBluetoothManager *)manager didFailToConnectPeripheral:(CBPeripheral *)peripheral error:(nullable NSError *)error
+{
+    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
     {
-        
+        return;
+    }
+    
+    NSError * err = [NSError errorWithDomain:domain5 code:FLYBluetoothErrorCodeConnect userInfo:nil];
+    !self.failure ?: self.failure(err);
+    [self reset];
+}
+
+// 断开连接
+-(void)bluetoothManager:(FLYBluetoothManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error
+{
+    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
+    {
+        return;
+    }
+    
+    
+    if ( error )
+    {
+        NSError * err = [NSError errorWithDomain:domain6 code:FLYBluetoothErrorCodeDisconnect userInfo:nil];
+        !self.failure ?: self.failure(err);
+        [self reset];
     }
     else
     {
-        
+        // 只有正常断开的才执行进度回调，意外断开属于错误，不属于进度。
+        !self.progress ?: self.progress(FLYBluetoothProgressDisconnected);
     }
 }
 
-
-
-#pragma mark - OTG
-
-// OTG的开锁指令
-- (NSData *)openLockCommandWithOTG
+// 扫描超时
+-(void)bluetoothManagerDidTimeout:(FLYBluetoothManager *)central
 {
-    // 字符串 转 data
-    NSData * data = [FLYBluetoothManager convertHexStringToData:@"343d0e9ef7b74e2d78248f208fbb6407b9"];
+    if ( self.deviceName == nil )
+    {
+        return;
+    }
+    
+    
+    NSError * err = [NSError errorWithDomain:domain4 code:FLYBluetoothErrorCodeTimeout userInfo:nil];
+    !self.failure ?: self.failure(err);
+    [self reset];
+}
 
-    return data;
+// 扫描到特征
+-(void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(NSError *)error
+{
+    for (CBCharacteristic * characteristic in service.characteristics )
+    {
+        // 如果有未执行的命令，则执行
+        if ( ([self.deviceName isEqualToString:peripheral.name] || [self.deviceName isEqualToString:peripheral.subName]) && [self.command.characteristicUUID isEqualToString:characteristic.UUID.UUIDString] )
+        {
+            if ( self.command.commandType == FLYCommandTypeWrite )
+            {
+                [[FLYBluetoothManager sharedManager] writeWithDeviceName:self.deviceName data:self.command.data characteristicUUID:self.command.characteristicUUID];
+            }
+            else if ( self.command.commandType == FLYCommandTypeRead )
+            {
+                [[FLYBluetoothManager sharedManager] readWithDeviceName:self.deviceName characteristicUUID:self.command.characteristicUUID];
+            }
+            
+            // 执行完之后置空
+            self.command = nil;
+        }
+        
+        // 特征具有通知属性，设置特征值的更新通知 （&是位运算中的按位与操作符）
+        if (characteristic.properties & CBCharacteristicPropertyNotify)
+        {
+            // 订阅, 实时接收 (在didUpdateValueForCharacteristic里返回)
+            [peripheral setNotifyValue:YES forCharacteristic:characteristic];
+        }
+        
+    }
+
+}
+
+/** 读取特征数据 或 订阅的特征值更新 的回调 */
+-(void)peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error
+{
+    /* 通常情况下，通知、读、写操作会使用不同的特征来实现，但也有一些特殊情况下可能会使用同一个特征来实现通知、读、写功能。这主要取决于蓝牙设备的设计和实现。
+    
+        通过特征的 isNotifying 属性来判断是谁的回调，YES是通知的回调(setNotifyValue:forCharacteristic:)，NO是主动读取的回调(readValueForCharacteristic:)。
+        
+        如果一个特征开启了通知，再执行读的操作，isNotifying就会不准确，无法判断是读取还是通知的回调。(最好读的特征就别在开通知了，但也有例外，比如某个特征值存储的是电量，开启通知，电量变化会主动通知，但也可以主动去读取一下电量还剩多少。)
+     */
+    
+    
+    if( characteristic.isNotifying )
+    {
+        !self.updateValue ?: self.updateValue(peripheral, characteristic, error);
+    }
+    else
+    {
+        if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
+        {
+            return;
+        }
+        
+        
+        if ( error )
+        {
+            NSError * err = [NSError errorWithDomain:domain8 code:FLYBluetoothErrorCodeRead userInfo:nil];
+            !self.failure ?: self.failure(err);
+            [self reset];
+        }
+        else
+        {
+            //如果读取的特征开了通知，读取成功不一定在这里返回，也可能在updateValue里返回，所以外界要把写在读取successBlock里的代码，也写到updateValueBlock里。（如果读取的特征不需要开启通知，就给他关咯，省的写两个地方）
+            !self.success ?: self.success(characteristic.value);
+            [self reset];
+        }
+    }
+}
+
+/** 写入数据后的回调 */
+- (void)peripheral:(CBPeripheral *)peripheral didWriteValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error
+{
+    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
+    {
+        return;
+    }
+    
+    
+    if ( error )
+    {
+        NSError * err = [NSError errorWithDomain:domain7 code:FLYBluetoothErrorCodeWrite userInfo:nil];
+        !self.failure ?: self.failure(err);
+        [self reset];
+        return;
+    }
+    
+    !self.success ?: self.success(nil);
+    [self reset];
 }
 
 
 
 #pragma mark - private methods
 
-// 获取开锁指令
-- (NSData *)getOpenLockCommand
+- (void)reset
 {
-    NSData * data;
+    // 执行完一个回调后，其他的都要置空。
+    // 如果其他地方直接使用了FLYBluetoothManager类操作了当前设备，这里的代理也会跟着回调，如果不置空，这些block又被执行一遍。
     
-    switch ( self.lockType )
-    {
-        case FLYLockTypeOTG:
-        {
-            data = [self openLockCommandWithOTG];
-        }
-            break;
-            
-        default:
-            break;
-    }
+    self.success = nil;
+    self.failure = nil;
+    self.progress = nil;
     
-    return data;
+    //command置空的原因：比如刚连接上，还没来得及执行指令，就意外断开了，已经执行了failure的回调，若此时重连代码让它重新连接了，发现了未执行的执行，又把指令执行了，这样就即回调了失败，指令又执行成功了。所以置空的时候也要把它给一起置空了。
+    self.command = nil;
 }
 
 
 @end
+

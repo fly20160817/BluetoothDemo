@@ -16,7 +16,8 @@
 
 @interface ConnectViewController () < FLYBluetoothManagerDelegate >
 
-@property (weak, nonatomic) IBOutlet UITextField *textField;
+@property (weak, nonatomic) IBOutlet UITextField *nameTF;
+@property (weak, nonatomic) IBOutlet UITextField *uuidTF;
 
 @end
 
@@ -26,42 +27,49 @@
     [super viewDidLoad];
     // Do any additional setup after loading the view.
     
-    self.textField.text = @"HNTT-06123450a6ddeb";
+    self.nameTF.text = @"ESP32";
+    self.uuidTF.text = @"0001";
     
-    [FLYBluetoothManager sharedManager].delegate = self;
+    
+    [[FLYBluetoothManager sharedManager] addDelegate:self];
 }
 
 - (IBAction)scanAndConnect:(UIButton *)sender
 {
-    [[FLYBluetoothManager sharedManager] scanAndConnect:self.textField.text success:^(CBPeripheral * _Nonnull peripheral) {
-        
-        NSLog(@"连接成功");
-        
-    } failure:^(NSError * _Nonnull error) {
-        
-        NSLog(@"连接失败：%@", error);
-    }];
-    
+    [[FLYBluetoothManager sharedManager] scanAndConnect:self.nameTF.text timeout:0];
 }
 
 - (IBAction)writeData:(UIButton *)sender
 {
-    NSData * data = [FLYBluetoothManager  convertHexStringToData:@"343d0e9ef7b74e2d78248f208fbb6407b9"];
-
-    [[FLYBluetoothManager sharedManager] writeData:data peripheral:nil characteristicUUID:@"FF01"];
+    NSString * dateString = @"5506";
+    NSData * data = [dateString dataUsingEncoding:NSUTF8StringEncoding];
+    
+    
+    [[FLYBluetoothManager sharedManager] writeWithDeviceName:self.nameTF.text data:data characteristicUUID:self.uuidTF.text];
 }
 
 
 
 #pragma mark - FLYBluetoothManagerDelegate
 
-// 读取数据后的回调
--(void)peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error
+-(void)peripheral:(CBPeripheral *)peripheral didWriteValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error
 {
-    NSLog(@"data = %@", characteristic.value);
+    if ( ![peripheral.name isEqualToString:self.nameTF.text] )
+    {
+        return;
+    }
+    
+    
+    if ( error )
+    {
+        NSLog(@"第一页_写入失败，characteristic.UUID = %@， error = %@", characteristic.UUID.UUIDString, error);
+    }
+    else
+    {
+        NSLog(@"第一页_写入成功，characteristic.UUID = %@", characteristic.UUID.UUIDString);
+    }
+    
 }
-
-
 
 
 @end

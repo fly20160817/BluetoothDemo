@@ -18,6 +18,8 @@
 //存放扫描到的外围设备的数组
 @property (nonatomic, strong) NSMutableArray<CBPeripheral *> * peripheralArray;
 
+@property (nonatomic, strong) CBPeripheral * peripheral;
+
 @end
 
 @implementation ListViewController
@@ -28,7 +30,8 @@
     [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"cell"];
     
     
-    [FLYBluetoothManager sharedManager].delegate = self;
+    
+    [[FLYBluetoothManager sharedManager] addDelegate:self];
     [[FLYBluetoothManager sharedManager] startScan];
 }
 
@@ -80,16 +83,22 @@
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     
     CBPeripheral * peripheral = self.peripheralArray[indexPath.row];
+    self.peripheral = peripheral;
     
-    [[FLYBluetoothManager sharedManager] connectPeripheral:peripheral success:^(CBPeripheral * _Nonnull peripheral) {
-        
-        NSLog(@"连接成功");
-        
-    } failure:^(NSError * _Nonnull error) {
-        
-        NSLog(@"连接失败：%@", error);
-        
-    }];
+    [[FLYBluetoothManager sharedManager] connectPeripheral:peripheral];
+}
+
+
+#pragma mark - FLYBluetoothManagerDelegate
+
+-(void)bluetoothManager:(FLYBluetoothManager *)manager didConnectPeripheral:(CBPeripheral *)peripheral
+{
+    if ( ![self.peripheral.name isEqualToString:peripheral.name] )
+    {
+        return;
+    }
+    
+    NSLog(@"第三页_连接成功");
 }
 
 
