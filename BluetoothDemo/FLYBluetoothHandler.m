@@ -430,7 +430,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     self.failure = nil;
     self.progress = nil;
     
-    //commandType置空的原因：比如刚连接上，还没来得及执行指令，就意外断开了，已经执行了failure的回调，若此时重连代码让它重新连接了，发现了未执行的执行，又把指令执行了，这样就即回调了失败，指令又执行成功了。所以置空的时候也要把它给一起置空了。
+    //command置空的原因：比如刚连接上，还没来得及执行指令，就意外断开了，已经执行了failure的回调，若此时重连代码让它重新连接了，发现了未执行的执行，又把指令执行了，这样就即回调了失败，指令又执行成功了。所以置空的时候也要把它给一起置空了。
     self.command = nil;
 }
 
