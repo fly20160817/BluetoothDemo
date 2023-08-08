@@ -279,8 +279,6 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 // 断开连接
 -(void)bluetoothManager:(FLYBluetoothManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error
 {
-    self.command = nil;
-    
     if ( ![self.command.deviceName isEqualToString:peripheral.name] && ![self.command.deviceName isEqualToString:peripheral.subName] )
     {
         return;
