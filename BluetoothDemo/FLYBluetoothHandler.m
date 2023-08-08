@@ -21,10 +21,12 @@ const NSErrorDomain domain8 = @"读取数据报错";
 @interface FLYCommand : NSObject
 
 typedef NS_ENUM(NSInteger, FLYCommandType) {
-    FLYCommandTypeRead = 1,    //读
-    FLYCommandTypeWrite = 2,   //写
+    FLYCommandTypeNone = 0,    // 无 (没有待执行的指令)
+    FLYCommandTypeRead = 1,    // 读
+    FLYCommandTypeWrite = 2,   // 写
 };
 
+@property (nonatomic, strong) NSString * deviceName;
 @property (nonatomic, strong) NSString * characteristicUUID;
 @property (nonatomic, assign) FLYCommandType commandType;
 @property (nonatomic, strong) NSData * data;
@@ -43,7 +45,6 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 @property (nonatomic, copy) ProgressBlock progress;
 @property (nonatomic, copy) UpdateValueBlock updateValue;
 
-@property (nonatomic, strong) NSString * deviceName;
 // 存放待执行的蓝牙命令 (外界传命令进来的时候，蓝牙可能还没连接，所以先把蓝牙命令保存，等连接后在执行命令。)
 @property (nonatomic, strong) FLYCommand * command;
 
@@ -80,7 +81,6 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 /// 往特征里写入数据
 - (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(SuccessBlock)success failure:(FailureBlock)failure progress:(ProgressBlock)progress
 {
-    self.deviceName = name;
     self.success = success;
     self.failure = failure;
     self.progress = progress;
@@ -94,9 +94,21 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     }
     
     
+    // 保存传进来的数据
+    FLYCommand * command = [[FLYCommand alloc] init];
+    command.deviceName = name;
+    command.characteristicUUID = characteristicUUID;
+    command.data = data;
+    command.commandType = FLYCommandTypeWrite;
+    self.command = command;
+    
+    
     //判断传进来的设备，是否已连接
     if ( [[FLYBluetoothManager sharedManager] isConnected:name] )
     {
+        // 已连接立马就调用了指令，所以要把 commandType 改成 None
+        command.commandType = FLYCommandTypeNone;
+        
         [[FLYBluetoothManager sharedManager] writeWithDeviceName:name data:data characteristicUUID:characteristicUUID];
         return;
     }
@@ -105,19 +117,12 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     !self.progress ?: self.progress(FLYBluetoothProgressScanning);
     [[FLYBluetoothManager sharedManager] scanAndConnect:name timeout:60];
     
-    // 保存蓝牙指定 (等连接成功之后执行)
-    FLYCommand * command = [[FLYCommand alloc] init];
-    command.characteristicUUID = characteristicUUID;
-    command.data = data;
-    command.commandType = FLYCommandTypeWrite;
-    self.command = command;
 }
 
 
 /// 读取特征的值
 - (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(SuccessBlock)success failure:(FailureBlock)failure progress:(ProgressBlock)progress
 {
-    self.deviceName = name;
     self.success = success;
     self.failure = failure;
     self.progress = progress;
@@ -130,9 +135,23 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     }
     
     
+    // 保存传进来的数据
+    FLYCommand * command = [[FLYCommand alloc] init];
+    command.deviceName = name;
+    command.characteristicUUID = characteristicUUID;
+    command.commandType = FLYCommandTypeRead;
+    self.command = command;
+    
+    
     //判断传进来的设备，是否已连接
     if ( [[FLYBluetoothManager sharedManager] isConnected:name] )
     {
+        // 已连接立马就调用了指令，所以要把 commandType 改成 None
+        command.commandType = FLYCommandTypeNone;
+        
+        // 读取前先把通知给关闭，不然回调里不能区分是读取的回调还是通知的回调。(回调收到数据后会重新打开)
+        [[FLYBluetoothManager sharedManager] setNotifyValue:NO forDeviceName:name characteristicUUID:characteristicUUID];
+        
         [[FLYBluetoothManager sharedManager] readWithDeviceName:name characteristicUUID:characteristicUUID];
         return;
     }
@@ -140,12 +159,6 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     
     !self.progress ?: self.progress(FLYBluetoothProgressScanning);
     [[FLYBluetoothManager sharedManager] scanAndConnect:name timeout:60];
-    
-    // 保存蓝牙指定 (等连接成功之后执行)
-    FLYCommand * command = [[FLYCommand alloc] init];
-    command.characteristicUUID = characteristicUUID;
-    command.commandType = FLYCommandTypeRead;
-    self.command = command;
 }
 
 
@@ -230,7 +243,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 // 连接外设中
 -(void)bluetoothManager:(FLYBluetoothManager *)manager connectingPeripheral:(CBPeripheral *)peripheral
 {
-    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
+    if ( ![self.command.deviceName isEqualToString:peripheral.name] && ![self.command.deviceName isEqualToString:peripheral.subName] )
     {
         return;
     }
@@ -242,7 +255,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 // 连接到外设后调用
 -(void)bluetoothManager:(FLYBluetoothManager *)manager didConnectPeripheral:(CBPeripheral *)peripheral
 {
-    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
+    if ( ![self.command.deviceName isEqualToString:peripheral.name] && ![self.command.deviceName isEqualToString:peripheral.subName] )
     {
         return;
     }
@@ -253,7 +266,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 // 连接外设失败
 - (void)bluetoothManager:(FLYBluetoothManager *)manager didFailToConnectPeripheral:(CBPeripheral *)peripheral error:(nullable NSError *)error
 {
-    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
+    if ( ![self.command.deviceName isEqualToString:peripheral.name] && ![self.command.deviceName isEqualToString:peripheral.subName] )
     {
         return;
     }
@@ -266,7 +279,9 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 // 断开连接
 -(void)bluetoothManager:(FLYBluetoothManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error
 {
-    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
+    self.command = nil;
+    
+    if ( ![self.command.deviceName isEqualToString:peripheral.name] && ![self.command.deviceName isEqualToString:peripheral.subName] )
     {
         return;
     }
@@ -288,7 +303,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 // 扫描超时
 -(void)bluetoothManagerDidTimeout:(FLYBluetoothManager *)central
 {
-    if ( self.deviceName == nil )
+    if ( self.command.deviceName == nil )
     {
         return;
     }
@@ -302,29 +317,39 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 // 扫描到特征
 -(void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(NSError *)error
 {
+    if ( ![self.command.deviceName isEqualToString:peripheral.name] && ![self.command.deviceName isEqualToString:peripheral.subName] )
+    {
+        return;
+    }
+    
+    
     for (CBCharacteristic * characteristic in service.characteristics )
     {
-        // 如果有未执行的命令，则执行
-        if ( ([self.deviceName isEqualToString:peripheral.name] || [self.deviceName isEqualToString:peripheral.subName]) && [self.command.characteristicUUID isEqualToString:characteristic.UUID.UUIDString] )
-        {
-            if ( self.command.commandType == FLYCommandTypeWrite )
-            {
-                [[FLYBluetoothManager sharedManager] writeWithDeviceName:self.deviceName data:self.command.data characteristicUUID:self.command.characteristicUUID];
-            }
-            else if ( self.command.commandType == FLYCommandTypeRead )
-            {
-                [[FLYBluetoothManager sharedManager] readWithDeviceName:self.deviceName characteristicUUID:self.command.characteristicUUID];
-            }
-            
-            // 执行完之后置空
-            self.command = nil;
-        }
-        
         // 特征具有通知属性，设置特征值的更新通知 （&是位运算中的按位与操作符）
         if (characteristic.properties & CBCharacteristicPropertyNotify)
         {
             // 订阅, 实时接收 (在didUpdateValueForCharacteristic里返回)
             [peripheral setNotifyValue:YES forCharacteristic:characteristic];
+        }
+        
+        
+        // 如果有未执行的命令，则执行
+        if ( [self.command.characteristicUUID isEqualToString:characteristic.UUID.UUIDString] && self.command.commandType != FLYCommandTypeNone )
+        {
+            if ( self.command.commandType == FLYCommandTypeWrite )
+            {
+                [[FLYBluetoothManager sharedManager] writeWithDeviceName:self.command.deviceName data:self.command.data characteristicUUID:self.command.characteristicUUID];
+            }
+            else if ( self.command.commandType == FLYCommandTypeRead )
+            {
+                // 读取前先把通知给关闭，不然回调里不能区分是读取的回调还是通知的回调。(回调收到数据后会重新打开)
+                [[FLYBluetoothManager sharedManager] setNotifyValue:NO forDeviceName:self.command.deviceName characteristicUUID:self.command.characteristicUUID];
+                
+                [[FLYBluetoothManager sharedManager] readWithDeviceName:self.command.deviceName characteristicUUID:self.command.characteristicUUID];
+            }
+            
+            // 执行完之后把操作类型设置成无
+            self.command.commandType = FLYCommandTypeNone;
         }
         
     }
@@ -348,10 +373,14 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     }
     else
     {
-        if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
+        if ( ![self.command.deviceName isEqualToString:peripheral.name] && ![self.command.deviceName isEqualToString:peripheral.subName] )
         {
             return;
         }
+        
+        
+        // 因为读取前先把通知给关闭，所以这里收到到数据后在给它打开。
+        [[FLYBluetoothManager sharedManager] setNotifyValue:YES forDeviceName:self.command.deviceName characteristicUUID:self.command.characteristicUUID];
         
         
         if ( error )
@@ -372,7 +401,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 /** 写入数据后的回调 */
 - (void)peripheral:(CBPeripheral *)peripheral didWriteValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error
 {
-    if ( ![self.deviceName isEqualToString:peripheral.name] && ![self.deviceName isEqualToString:peripheral.subName] )
+    if ( ![self.command.deviceName isEqualToString:peripheral.name] && ![self.command.deviceName isEqualToString:peripheral.subName] )
     {
         return;
     }
@@ -403,7 +432,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     self.failure = nil;
     self.progress = nil;
     
-    //command置空的原因：比如刚连接上，还没来得及执行指令，就意外断开了，已经执行了failure的回调，若此时重连代码让它重新连接了，发现了未执行的执行，又把指令执行了，这样就即回调了失败，指令又执行成功了。所以置空的时候也要把它给一起置空了。
+    //commandType置空的原因：比如刚连接上，还没来得及执行指令，就意外断开了，已经执行了failure的回调，若此时重连代码让它重新连接了，发现了未执行的执行，又把指令执行了，这样就即回调了失败，指令又执行成功了。所以置空的时候也要把它给一起置空了。
     self.command = nil;
 }
 

@@ -757,6 +757,40 @@ static FLYBluetoothManager * _manager;
     
 }
 
+// 开启或关闭特征值的通知
+- (void)setNotifyValue:(BOOL)enabled forDeviceName:(NSString *)deviceName characteristicUUID:(NSString *)characteristicUUID
+{
+    // 获取设备
+    CBPeripheral * peripheral = [self getConnectModelForDeviceName:deviceName].peripheral;
+    
+    // 获取不到设备说明没连接
+    if ( peripheral == nil )
+    {
+        NSLog(@"通知设置失败，未找到设备 %@", deviceName);
+        return;
+    }
+    
+    
+    // 获取特征
+    CBCharacteristic * characteristic = [self getCharacteristicsWithPeripheral:peripheral characteristicUUID:characteristicUUID];
+    
+    // 特征的UUID都是开发时和硬件部门定好的，不存在找不到的情况，所以这里不需要搞失败的回调。
+    if ( characteristic == nil )
+    {
+        NSLog(@"通知设置据失败，未找到 %@ 特征", characteristicUUID);
+        return;
+    }
+    
+    
+    // 特征具有通知属性 （&是位运算中的按位与操作符）
+    if (characteristic.properties & CBCharacteristicPropertyNotify)
+    {
+        // 开启或关闭特征值的通知
+        [peripheral setNotifyValue:enabled forCharacteristic:characteristic];
+    }
+
+}
+
 
 
 #pragma mark - action

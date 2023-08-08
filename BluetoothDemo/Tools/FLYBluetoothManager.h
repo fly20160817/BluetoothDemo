@@ -133,6 +133,13 @@ NS_ASSUME_NONNULL_BEGIN
 ///   - characteristicUUID: 特征的UUID
 - (void)writeWithDeviceName:(NSString *)deviceName data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID;
 
+/// 开启/关闭特征值的通知
+/// - Parameters:
+///   - enabled: YES 开启   NO 关闭
+///   - deviceName: 外设名称
+///   - characteristicUUID: 特征的UUID
+- (void)setNotifyValue:(BOOL)enabled forDeviceName:(NSString *)deviceName characteristicUUID:(NSString *)characteristicUUID;
+
 @end
 
 
