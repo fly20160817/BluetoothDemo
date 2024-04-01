@@ -28,7 +28,7 @@
  
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CoreBluetooth.h>
-#import "CBPeripheral+FLYExtension.h"
+#import <FLYKit/CBPeripheral+FLYExtension.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -67,7 +67,7 @@ NS_ASSUME_NONNULL_BEGIN
 /** 扫描到特征时的回调 (内部会开启特征值的通知。如果没有特殊需求，外界不需要实现此代理)(如果需要关闭通知，外界实现此代理，在代理中关闭即可) */
 -(void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(NSError *)error;
 
-/** 特征里的值更新时回调 */ 
+/** 特征里的值更新时回调 */
 -(void)peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error;
 
 /** 写入数据后的回调 */
@@ -144,4 +144,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 
 NS_ASSUME_NONNULL_END
+
+
 

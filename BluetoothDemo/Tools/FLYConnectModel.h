@@ -1,6 +1,6 @@
 //
 //  FLYConnectModel.h
-//  BluetoothDemo
+//  FLYKit
 //
 //  Created by fly on 2023/8/8.
 //
@@ -42,3 +42,5 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 NS_ASSUME_NONNULL_END
+
+

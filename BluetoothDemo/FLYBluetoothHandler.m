@@ -40,10 +40,10 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 
 @interface FLYBluetoothHandler () < FLYBluetoothManagerDelegate >
 
-@property (nonatomic, copy) SuccessBlock success;
-@property (nonatomic, copy) FailureBlock failure;
-@property (nonatomic, copy) ProgressBlock progress;
-@property (nonatomic, copy) UpdateValueBlock updateValue;
+@property (nonatomic, copy) BLESuccessBlock success;
+@property (nonatomic, copy) BLEFailureBlock failure;
+@property (nonatomic, copy) BLEProgressBlock progress;
+@property (nonatomic, copy) BLEUpdateValueBlock updateValue;
 
 // 存放待执行的蓝牙命令 (外界传命令进来的时候，蓝牙可能还没连接，所以先把蓝牙命令保存，等连接后在执行命令。)
 @property (nonatomic, strong) FLYCommand * command;
@@ -79,7 +79,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 
 
 /// 往特征里写入数据
-- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(SuccessBlock)success failure:(FailureBlock)failure progress:(ProgressBlock)progress
+- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(BLESuccessBlock)success failure:(BLEFailureBlock)failure progress:(BLEProgressBlock)progress
 {
     self.success = success;
     self.failure = failure;
@@ -121,7 +121,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 
 
 /// 读取特征的值
-- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(SuccessBlock)success failure:(FailureBlock)failure progress:(ProgressBlock)progress
+- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(BLESuccessBlock)success failure:(BLEFailureBlock)failure progress:(BLEProgressBlock)progress
 {
     self.success = success;
     self.failure = failure;
@@ -163,7 +163,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 
 
 /// 特征里的值更新时回调
-- (void)bluetoothDidUpdateValueForCharacteristic:(UpdateValueBlock)updateValue
+- (void)bluetoothDidUpdateValueForCharacteristic:(BLEUpdateValueBlock)updateValue
 {
     self.updateValue = updateValue;
 }
@@ -436,4 +436,5 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 
 
 @end
+
 

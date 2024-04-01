@@ -23,7 +23,7 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CoreBluetooth.h>
-#import "FLYBluetoothManager.h"
+#import <FLYKit/FLYBluetoothManager.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -49,11 +49,11 @@ typedef NS_ENUM(NSInteger, FLYBluetoothProgress) {
 };
 
 
-typedef void(^SuccessBlock)(NSData * _Nullable data);
-typedef void(^FailureBlock)(NSError * error);
-typedef void(^ProgressBlock)(FLYBluetoothProgress progress);
+typedef void(^BLESuccessBlock)(NSData * _Nullable data);
+typedef void(^BLEFailureBlock)(NSError * error);
+typedef void(^BLEProgressBlock)(FLYBluetoothProgress progress);
 // 根据peripheral的name或者subName属性来判断是哪个设备的回调，然后根据 characteristic.UUID.UUIDString 来区分是哪个特征的数据，数据在 characteristic.value 里面。
-typedef void(^UpdateValueBlock)(CBPeripheral * peripheral, CBCharacteristic * characteristic, NSError * error);
+typedef void(^BLEUpdateValueBlock)(CBPeripheral * peripheral, CBCharacteristic * characteristic, NSError * error);
 
 // 蓝牙状态异常时，是否显示提示弹窗，默认YES (系统的弹窗样式，如果要修改样式，就把这个属性设置为NO，然后外界在失败的回调里判断code，自己写弹窗。)
 @property (nonatomic, assign, getter=isShowAlert) BOOL showAlert;
@@ -70,7 +70,7 @@ typedef void(^UpdateValueBlock)(CBPeripheral * peripheral, CBCharacteristic * ch
 ///   - success: 成功的回调
 ///   - failure: 失败的回调
 ///   - progress: 进度 (扫描中、连接中、连接成功、断开连接)
-- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(SuccessBlock)success failure:(FailureBlock)failure progress:(ProgressBlock)progress;
+- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(BLESuccessBlock)success failure:(BLEFailureBlock)failure progress:(BLEProgressBlock)progress;
 
 
 /// 读取特征的值
@@ -80,15 +80,16 @@ typedef void(^UpdateValueBlock)(CBPeripheral * peripheral, CBCharacteristic * ch
 ///   - success: 成功的回调
 ///   - failure: 失败的回调
 ///   - progress: 进度 (扫描中、连接中、连接成功、断开连接)
-- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(SuccessBlock)success failure:(FailureBlock)failure progress:(ProgressBlock)progress;
+- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(BLESuccessBlock)success failure:(BLEFailureBlock)failure progress:(BLEProgressBlock)progress;
 
 
 /// 特征里的值更新时回调
 /// - Parameter value: 回调返回的数据
-- (void)bluetoothDidUpdateValueForCharacteristic:(UpdateValueBlock)updateValue;
+- (void)bluetoothDidUpdateValueForCharacteristic:(BLEUpdateValueBlock)updateValue;
 
 
 @end
 
 
 NS_ASSUME_NONNULL_END
+

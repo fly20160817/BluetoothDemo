@@ -1,6 +1,6 @@
 //
 //  FLYConnectModel.m
-//  BluetoothDemo
+//  FLYKit
 //
 //  Created by fly on 2023/8/8.
 //
@@ -55,4 +55,5 @@
 }
 
 @end
+
 
