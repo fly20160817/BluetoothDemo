@@ -23,7 +23,7 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CoreBluetooth.h>
-#import <FLYKit/FLYBluetoothManager.h>
+#import "FLYBluetoothManager.h"
 
 NS_ASSUME_NONNULL_BEGIN
 

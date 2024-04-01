@@ -28,7 +28,7 @@
  
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CoreBluetooth.h>
-#import <FLYKit/CBPeripheral+FLYExtension.h>
+#import "CBPeripheral+FLYExtension.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
