@@ -396,22 +396,35 @@ static FLYBluetoothManager * _manager;
          
          这些属性不是所有蓝牙设备都支持的，具体支持的属性取决于蓝牙设备的设计和实现。在使用特征时，可以通过检查特征的属性来判断设备是否支持某些功能。
          */
-                                        
+
+
+        // CBCharacteristicProperties 是一个位域枚举（bitwise enum），这意味着每个枚举值都是一个独立的位。在内存中，这些枚举值可以组合在一起，形成一个表示多个属性的位掩码。
+
+         
         // 特征具有写入属性
         if (characteristic.properties & CBCharacteristicPropertyWrite)
         {
+            NSLog(@"%@ 特征具有写入属性", characteristic.UUID);
+        }
 
+        // 特征具有无需响应的写入属性
+        if (characteristic.properties & CBCharacteristicPropertyWriteWithoutResponse)
+        {
+            NSLog(@"%@ 特征具有无需响应写入属性", characteristic.UUID);
         }
         
         // 特征具有读取属性
         if (characteristic.properties & CBCharacteristicPropertyRead)
         {
-
+            NSLog(@"%@ 特征具有读取属性", characteristic.UUID);
         }
         
         // 特征具有通知属性 （&是位运算中的按位与操作符）
         if (characteristic.properties & CBCharacteristicPropertyNotify)
         {
+             NSLog(@"%@ 特征具有通知属性", characteristic.UUID);
+
+             
             // 开启特征值的通知 (开启通知后，在 peripheral:didUpdateValueForCharacteristic:error: 代理中监听特征值的更新通知。)
             [peripheral setNotifyValue:YES forCharacteristic:characteristic];
         }
@@ -741,19 +754,21 @@ static FLYBluetoothManager * _manager;
      1.CBCharacteristicWriteWithResponse: 写入特征值时需要外设返回响应，可以通过 peripheral:didWriteValueForCharacteristic:error: 方法来接收写入操作的结果。这种方式可以确保写入操作的准确性，但因为需要等待外设响应，可能会增加通信的延迟。
      
      2.CBCharacteristicWriteWithoutResponse: 写入特征值时无需外设返回响应，即写入操作后不等待外设的确认。这种方式适用于一些实时数据传输场景，可以减少通信的延迟，但写入操作的准确性可能没有保障。
-     
-     当一个特征的 properties 属性中包含 CBCharacteristicPropertyWriteWithoutResponse 时，表示该特征支持无需响应的写入操作。在使用 writeValue:forCharacteristic:type: 方法进行写入时，可以使用 CBCharacteristicWriteWithoutResponse 作为写入类型来进行写入操作。
-     
-     // 判断特征是否支持写入操作
-     if (characteristic.properties & CBCharacteristicPropertyWriteWithoutResponse)
-     {
-        // 特征支持无需响应的写入操作
-        // 调用写入方法，写入数据
-        [peripheral writeValue:data forCharacteristic:characteristic type:CBCharacteristicWriteWithoutResponse];
-     }
      */
+
     
-    [peripheral writeValue:data forCharacteristic:characteristic type:CBCharacteristicWriteWithResponse];
+    // 这两个属性它们是互斥的。一个特征只能具有其中的一种属性，不可能同时具有这两个属性。
+    
+    // 默认是 需要外设返回响应 类型
+    CBCharacteristicWriteType writeType = CBCharacteristicWriteWithResponse;
+    
+    // 如果特征具有无需响应的写入属性，则改为 无需外设返回响应 类型
+    if (characteristic.properties & CBCharacteristicPropertyWriteWithoutResponse)
+    {
+        writeType = CBCharacteristicWriteWithoutResponse;
+    }
+    
+    [peripheral writeValue:data forCharacteristic:characteristic type:writeType];
     
 }
 
