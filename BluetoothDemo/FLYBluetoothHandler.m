@@ -70,7 +70,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     self = [super init];
     if (self) {
         [[FLYBluetoothManager sharedManager] addDelegate:self];
-        [FLYBluetoothManager sharedManager].reconnect = YES;
+        //[FLYBluetoothManager sharedManager].reconnect = YES;
         
         self.showAlert = YES;
     }
