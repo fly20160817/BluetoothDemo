@@ -680,7 +680,11 @@ static FLYBluetoothManager * _manager;
 - (void)disconnectPeripheral:(NSString *)deviceName
 {
     FLYConnectModel * connectModel = [self getConnectModelForDeviceName:deviceName];
-    [self.centralManager cancelPeripheralConnection:connectModel.peripheral];
+    // 必须非nil判断，直接传nil会闪退
+    if ( connectModel.peripheral != nil )
+    {
+        [self.centralManager cancelPeripheralConnection:connectModel.peripheral];
+    }
 }
 
 /// 设备是否已连接
