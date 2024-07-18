@@ -332,7 +332,7 @@ static FLYBluetoothManager * _manager;
 #pragma mark - CBPeripheralDelegate 外设代理
 
 // 扫描到外设的服务时回调 (即使有多个服务，也只会回调一次，拿到的是数组，所有的服务都在里面)
-- (void)peripheral:(CBPeripheral *)peripheral didDiscoverServices:(NSError *)error
+- (void)peripheral:(CBPeripheral *)peripheral didDiscoverServices:(nullable NSError *)error
 {
     if( error )
     {
@@ -368,7 +368,7 @@ static FLYBluetoothManager * _manager;
 }
 
 // 扫描到服务的特征时回调  (一个服务只会回调一次，拿到的是数组，该服务的所有特征都在里面)
-- (void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(NSError *)error
+- (void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(nullable NSError *)error
 {
     if( error )
     {
@@ -448,7 +448,7 @@ static FLYBluetoothManager * _manager;
 }
 
 // 特征值更新通知 或 读取特征值 时回调
-- (void)peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error
+- (void)peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(nullable NSError *)error
 {
     /* 通常情况下，通知、读、写操作会使用不同的特征来实现，但也有一些特殊情况下可能会使用同一个特征来实现通知、读、写功能。这主要取决于蓝牙设备的设计和实现。
     
@@ -478,9 +478,8 @@ static FLYBluetoothManager * _manager;
 
 }
 
-
 //写入数据回调
-- (void)peripheral:(CBPeripheral *)peripheral didWriteValueForCharacteristic:(nonnull CBCharacteristic *)characteristic error:(nullable NSError *)error
+- (void)peripheral:(CBPeripheral *)peripheral didWriteValueForCharacteristic:(CBCharacteristic *)characteristic error:(nullable NSError *)error
 {
     if ( error )
     {
@@ -504,6 +503,39 @@ static FLYBluetoothManager * _manager;
         }
     }
     
+}
+
+// 当通知状态（即是否监听特征值的变化）发生变化时会被调用。这个方法可以用来处理成功或失败的通知订阅操作。
+-(void)peripheral:(CBPeripheral *)peripheral didUpdateNotificationStateForCharacteristic:(CBCharacteristic *)characteristic error:(nullable NSError *)error
+{
+    if( error )
+    {
+        NSLog(@"%@ 订阅或取消订阅 %@ 特征通知出错：%@", peripheral.subName ? peripheral.subName : peripheral.name, characteristic.UUID.UUIDString, error);
+    }
+    else
+    {
+        if (characteristic.isNotifying) {
+            
+            NSLog(@"%@ 订阅 %@ 特征通知成功", peripheral.subName ? peripheral.subName : peripheral.name, characteristic.UUID.UUIDString);
+        }
+        else
+        {
+            NSLog(@"%@ 取消订阅 %@ 特征通知成功", peripheral.subName ? peripheral.subName : peripheral.name, characteristic.UUID.UUIDString);
+        }
+    }
+    
+    
+    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
+    NSHashTable * tempDelegates = self.delegates.copy;
+    
+    // 遍历所有代理，并执行回调
+    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
+    {
+        if ( [delegate respondsToSelector:@selector(peripheral:didUpdateNotificationStateForCharacteristic:error:)] )
+        {
+            [delegate peripheral:peripheral didUpdateNotificationStateForCharacteristic:characteristic error:error];
+        }
+    }
 }
 
 
@@ -927,6 +959,7 @@ static FLYBluetoothManager * _manager;
 
 
 @end
+
 
 
 
