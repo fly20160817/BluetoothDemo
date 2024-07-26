@@ -718,15 +718,16 @@ static FLYBluetoothManager * _manager;
         return;
     }
     
-    // 必须非nil判断，直接传nil会闪退
+    // 如果已经连接了
     if ( connectModel.peripheral != nil )
     {
         [self.centralManager cancelPeripheralConnection:connectModel.peripheral];
     }
+    // 如果还没连接上
     else
     {
         /*
-         connectModel.peripheral == nil 说明设备还没有连接上，还在扫描中就执行了断开连接指令，
+         设备还没有连接上，还在扫描中就执行了断开连接指令，
          此时要把它从数组中移除，如果没有其他要扫描的设备，就停止扫描。
          */
         
@@ -981,6 +982,8 @@ static FLYBluetoothManager * _manager;
 
 
 @end
+
+
 
 
 
