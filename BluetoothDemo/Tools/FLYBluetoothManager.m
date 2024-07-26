@@ -712,11 +712,33 @@ static FLYBluetoothManager * _manager;
 - (void)disconnectPeripheral:(NSString *)deviceName
 {
     FLYConnectModel * connectModel = [self getConnectModelForDeviceName:deviceName];
+    
+    if (connectModel == nil)
+    {
+        return;
+    }
+    
     // 必须非nil判断，直接传nil会闪退
     if ( connectModel.peripheral != nil )
     {
         [self.centralManager cancelPeripheralConnection:connectModel.peripheral];
     }
+    else
+    {
+        /*
+         connectModel.peripheral == nil 说明设备还没有连接上，还在扫描中就执行了断开连接指令，
+         此时要把它从数组中移除，如果没有其他要扫描的设备，就停止扫描。
+         */
+        
+        [self.connectModels removeObject:connectModel];
+        
+        // 如果数组里不存在还未开始连接的设备，并且centralManager还在扫描中，就停止扫描（一直扫描浪费资源）
+        if ( [self isUnconnected] == NO && self.centralManager.isScanning )
+        {
+            [self stopScan];
+        }
+    }
+    
 }
 
 /// 设备是否已连接
@@ -902,7 +924,7 @@ static FLYBluetoothManager * _manager;
     // 遍历数组，找到指定的model
     for ( FLYConnectModel *connectModel in self.connectModels )
     {
-        if ( [connectModel.peripheral.name isEqualToString:deviceName] || [connectModel.peripheral.subName isEqualToString:deviceName]  )
+        if ( [connectModel.connectName isEqualToString:deviceName] )
         {
             return connectModel;
         }
@@ -959,6 +981,7 @@ static FLYBluetoothManager * _manager;
 
 
 @end
+
 
 
 
