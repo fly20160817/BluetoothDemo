@@ -579,6 +579,18 @@ static FLYBluetoothManager * _manager;
     }
     
     
+    // 如果 connectModel 存在，说明之前就执行过扫描并连接设备，只是还没有连接上，我们删除它，然后创建新的。
+    if ( connectModel != nil )
+    {
+        // 必须停止计时器，不然从数组移除后，对象也不会销毁，要等计时器结束才会销毁。
+        if ( connectModel.isOpenTimer )
+        {
+            [connectModel stopTimer];
+        }
+        [self.connectModels removeObject:connectModel];
+    }
+    
+    
     // 如果还没连接，则创建 model 保存数据。
     FLYConnectModel * newModel = [[FLYConnectModel alloc] init];
     newModel.connectName = name;
@@ -624,6 +636,24 @@ static FLYBluetoothManager * _manager;
 {
     [self.centralManager stopScan];
     self.isScanning = NO;
+    
+    
+    /*
+     当外部调用停止扫描时，应清除所有未连接的设备信息。这样做可以防止在下次开启扫描时，可能自动连接到上次未成功连接的设备。
+     (内部只有当所有设备都连接后才会调用停止扫描，不存在误删未连接，所以只有外界主动调用停止扫描，才会清空未连接)
+     */
+    for (FLYConnectModel * connectModel in self.connectModels)
+    {
+        if ( [self isConnected:connectModel.connectName] == NO )
+        {
+            // 必须停止计时器，不然从数组移除后，对象也不会销毁，要等计时器结束才会销毁。
+            if ( connectModel.isOpenTimer )
+            {
+                [connectModel stopTimer];
+            }
+            [self.connectModels removeObject:connectModel];
+        }
+    }
 }
 
 /// 连接外围设备
@@ -718,19 +748,23 @@ static FLYBluetoothManager * _manager;
         return;
     }
     
-    // 如果已经连接了
+    // 必须非nil判断，直接传nil会闪退
     if ( connectModel.peripheral != nil )
     {
         [self.centralManager cancelPeripheralConnection:connectModel.peripheral];
     }
-    // 如果还没连接上
     else
     {
         /*
-         设备还没有连接上，还在扫描中就执行了断开连接指令，
+         connectModel.peripheral == nil 说明设备还没有连接上，还在扫描中就执行了断开连接指令，
          此时要把它从数组中移除，如果没有其他要扫描的设备，就停止扫描。
          */
         
+        // 必须停止计时器，不然从数组移除后，对象也不会销毁，要等计时器结束才会销毁。
+        if ( connectModel.isOpenTimer )
+        {
+            [connectModel stopTimer];
+        }
         [self.connectModels removeObject:connectModel];
         
         // 如果数组里不存在还未开始连接的设备，并且centralManager还在扫描中，就停止扫描（一直扫描浪费资源）
@@ -982,8 +1016,6 @@ static FLYBluetoothManager * _manager;
 
 
 @end
-
-
 
 
 

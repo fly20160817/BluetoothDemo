@@ -117,7 +117,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///   - peripheral: 外设对象
 - (void)connectPeripheral:(CBPeripheral *)peripheral;
 
-/// 断开外围设备 (因为支持同时连接多个蓝牙设备，所以要指定哪个设备)
+/// 断开外围设备 (如果此设备还未连接上(还在扫描中)，执行此方法就不会再扫描连接它了)
 - (void)disconnectPeripheral:(NSString *)deviceName;
 
 /// 设备是否已连接
