@@ -644,7 +644,7 @@ static FLYBluetoothManager * _manager;
      */
     for (FLYConnectModel * connectModel in self.connectModels)
     {
-        if ( [self isConnected:connectModel.connectName] == NO )
+        if ( connectModel.peripheral == nil )
         {
             // 必须停止计时器，不然从数组移除后，对象也不会销毁，要等计时器结束才会销毁。
             if ( connectModel.isOpenTimer )
@@ -1017,6 +1017,8 @@ static FLYBluetoothManager * _manager;
 
 
 @end
+
+
 
 
 
