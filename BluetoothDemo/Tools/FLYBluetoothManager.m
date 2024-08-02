@@ -213,6 +213,40 @@ static FLYBluetoothManager * _manager;
                         }
                     }
                 }
+                
+                
+                
+                /**********************************************************/
+                // R7 的 mac 在 kCBAdvDataManufacturerData 里，上面的代码拿不到，为了取R7的mac，单独加的代码
+                
+                NSData *manufacturerData = advertisementData[@"kCBAdvDataManufacturerData"];
+           
+                // 截取第8位往后6位，为mac地址 （R7的8～13位是mac）
+                if (manufacturerData.length > 14)
+                {
+                    NSRange macRange = NSMakeRange(7, 6);
+                    NSData *macData = [manufacturerData subdataWithRange:macRange];
+                    
+                    NSMutableString *macString = [NSMutableString stringWithCapacity:12];
+                    const unsigned char *dataBytes = macData.bytes;
+                    for (NSInteger i = 0; i < macData.length; i++)
+                    {
+                        [macString appendFormat:@"%02x", dataBytes[i]];
+                    }
+                    
+                    if ( [macString isEqualToString:connectModel.connectName] )
+                    {
+                        // 保存广播里的这个值
+                        peripheral.subName = macString;
+                        //peripheral必须保存起来才能连接，不然会被释放。
+                        connectModel.peripheral = peripheral;
+                    
+                        [self connectPeripheral:peripheral];
+                    }
+                    NSLog(@"mac地址: %@, manufacturerData = %@", macString, manufacturerData);
+                }
+                
+                /**********************************************************/
             }
         }
     }
