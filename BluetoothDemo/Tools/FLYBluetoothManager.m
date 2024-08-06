@@ -247,6 +247,7 @@ static FLYBluetoothManager * _manager;
                 }
                 
                 /**********************************************************/
+                
             }
         }
     }
@@ -676,18 +677,19 @@ static FLYBluetoothManager * _manager;
      当外部调用停止扫描时，应清除所有未连接的设备信息。这样做可以防止在下次开启扫描时，可能自动连接到上次未成功连接的设备。
      (内部只有当所有设备都连接后才会调用停止扫描，不存在误删未连接，所以只有外界主动调用停止扫描，才会清空未连接)
      */
-    for (FLYConnectModel * connectModel in self.connectModels)
-    {
-        if ( connectModel.peripheral == nil )
+    // 使用逆遍历，不然边遍历边删除会闪退
+    [self.connectModels enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(FLYConnectModel *connectModel, NSUInteger idx, BOOL * _Nonnull stop) {
+        
+        if (connectModel.peripheral == nil)
         {
             // 必须停止计时器，不然从数组移除后，对象也不会销毁，要等计时器结束才会销毁。
-            if ( connectModel.isOpenTimer )
+            if (connectModel.isOpenTimer)
             {
                 [connectModel stopTimer];
             }
-            [self.connectModels removeObject:connectModel];
+            [self.connectModels removeObjectAtIndex:idx];
         }
-    }
+    }];
 }
 
 /// 连接外围设备
