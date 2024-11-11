@@ -635,8 +635,6 @@ static FLYBluetoothManager * _manager;
             [connectModel stopTimer];
         }
         [self.connectModels removeObject:connectModel];
-        
-        return;
     }
     
     
