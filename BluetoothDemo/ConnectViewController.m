@@ -27,8 +27,8 @@
     [super viewDidLoad];
     // Do any additional setup after loading the view.
     
-    self.nameTF.text = @"ESP32";
-    self.uuidTF.text = @"0001";
+    self.nameTF.text = @"ecdb70c87c5b";
+    self.uuidTF.text = @"AF02";
     
     
     [[FLYBluetoothManager sharedManager] addDelegate:self];

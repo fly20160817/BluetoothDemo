@@ -326,10 +326,6 @@ static FLYBluetoothManager * _manager;
 //断开外设连接
 - (void)centralManager:(CBCentralManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(nullable NSError *)error
 {
-    // 从数组里删除 (先从数组里删除，如果先执行了下面的重连代码再执行删除，重连添加进去的又被删除了)
-    FLYConnectModel * connectModel = [self getConnectModelForPeripheral:peripheral];
-    [self.connectModels removeObject:connectModel];
-    
     
     if ( error )
     {
@@ -341,10 +337,20 @@ static FLYBluetoothManager * _manager;
         {
             [self connectPeripheral:peripheral];
         }
+        else
+        {
+            // 从数组里删除 (上面重连的情况不要删)
+            FLYConnectModel * connectModel = [self getConnectModelForPeripheral:peripheral];
+            [self.connectModels removeObject:connectModel];
+        }
     }
     else
     {
         NSLog(@"外设连接断开成功：%@", peripheral);
+        
+        // 从数组里删除
+        FLYConnectModel * connectModel = [self getConnectModelForPeripheral:peripheral];
+        [self.connectModels removeObject:connectModel];
     }
     
     
@@ -613,6 +619,12 @@ static FLYBluetoothManager * _manager;
         return;
     }
     
+    // 如果已经是正在连接中了，不用做其他的，等等就好了
+    if ( connectModel.peripheral.state == CBPeripheralStateConnecting )
+    {
+        return;
+    }
+    
     
     // 如果 connectModel 存在，说明之前就执行过扫描并连接设备，只是还没有连接上，我们删除它，然后创建新的。
     if ( connectModel != nil )
@@ -623,6 +635,8 @@ static FLYBluetoothManager * _manager;
             [connectModel stopTimer];
         }
         [self.connectModels removeObject:connectModel];
+        
+        return;
     }
     
     
@@ -704,7 +718,6 @@ static FLYBluetoothManager * _manager;
      
       disconnecting 外围设备正在与中央经理断开连接
      */
-    
     
     // 如果已经连接了，直接调用连接成功的代理，然后retun
     if ( peripheral.state == CBPeripheralStateConnected )

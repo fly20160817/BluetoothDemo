@@ -7,8 +7,22 @@
 
 #import "FLYConnectModel.h"
 
+@interface FLYConnectModel ()
+
+/// 用来做扫描超时的计时器  (加上nullable，可以避免self.timer = nil;的时候有警告)
+@property (nonatomic, strong, nullable) NSTimer * timer;
+
+/// 计时器是否已打开
+@property (nonatomic, assign) BOOL isOpenTimer;
+
+@end
+
 @implementation FLYConnectModel
 
+- (void)dealloc
+{
+    NSLog(@"----------------销毁咯：%@，connectName = %@----------------", self, self.connectName);
+}
 
 - (void)countdownClick
 {
@@ -55,5 +69,6 @@
 }
 
 @end
+
 
 
