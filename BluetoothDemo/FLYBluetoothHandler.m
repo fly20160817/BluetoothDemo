@@ -79,7 +79,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 
 
 /// 往特征里写入数据
-- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(void (^)(void))success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress
+- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(nullable void (^)(void))success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress
 {
     // 写入成功的block是没有参数的，而self.success是有参数的，赋值会报错，所以需要强转一下。
     self.success = (void (^)(id))success;
