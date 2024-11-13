@@ -70,7 +70,7 @@ typedef void(^BLEUpdateValueBlock)(CBPeripheral * peripheral, CBCharacteristic *
 ///   - success: 成功的回调
 ///   - failure: 失败的回调
 ///   - progress: 进度 (扫描中、连接中、连接成功、断开连接)
-- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(BLESuccessBlock)success failure:(BLEFailureBlock)failure progress:(BLEProgressBlock)progress;
+- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(nullable BLESuccessBlock)success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress;
 
 
 /// 读取特征的值
@@ -80,7 +80,7 @@ typedef void(^BLEUpdateValueBlock)(CBPeripheral * peripheral, CBCharacteristic *
 ///   - success: 成功的回调
 ///   - failure: 失败的回调
 ///   - progress: 进度 (扫描中、连接中、连接成功、断开连接)
-- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(BLESuccessBlock)success failure:(BLEFailureBlock)failure progress:(BLEProgressBlock)progress;
+- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(nullable BLESuccessBlock)success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress;
 
 
 /// 特征里的值更新时回调

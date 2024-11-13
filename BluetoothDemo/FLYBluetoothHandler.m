@@ -79,7 +79,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 
 
 /// 往特征里写入数据
-- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(BLESuccessBlock)success failure:(BLEFailureBlock)failure progress:(BLEProgressBlock)progress
+- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(nullable BLESuccessBlock)success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress
 {
     self.success = success;
     self.failure = failure;
@@ -121,7 +121,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 
 
 /// 读取特征的值
-- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(BLESuccessBlock)success failure:(BLEFailureBlock)failure progress:(BLEProgressBlock)progress
+- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(nullable BLESuccessBlock)success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress
 {
     self.success = success;
     self.failure = failure;
