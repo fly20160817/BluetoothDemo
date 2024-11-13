@@ -51,7 +51,7 @@
     NSString * dateString = @"11open";
     NSData * data = [dateString dataUsingEncoding:NSUTF8StringEncoding];
     
-    [[FLYBluetoothHandler sharedHandler] bluetoothWriteWithDeviceName:_deviceName data:data characteristicUUID:@"36F5" success:^(NSData * _Nullable data) {
+    [[FLYBluetoothHandler sharedHandler] bluetoothWriteWithDeviceName:_deviceName data:data characteristicUUID:@"36F5" success:^() {
         
         NSLog(@"第二页_写入成功");
         
