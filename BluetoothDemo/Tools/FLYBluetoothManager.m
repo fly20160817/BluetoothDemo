@@ -852,10 +852,24 @@ static FLYBluetoothManager * _manager;
     // 获取特征
     CBCharacteristic * characteristic = [self getCharacteristicsWithPeripheral:peripheral characteristicUUID:characteristicUUID];
     
-    // 特征的UUID都是开发时和硬件部门定好的，不存在找不到的情况，所以这里不需要搞失败的回调。
     if ( characteristic == nil )
     {
-        NSLog(@"读取数据失败，未找到 %@ 特征", characteristicUUID);
+        NSLog(@"%@ 读取数据失败，未找到 %@ 特征", deviceName, characteristicUUID);
+        
+        // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
+        NSHashTable * tempDelegates = self.delegates.copy;
+        
+        // 遍历所有代理，并执行回调
+        for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
+        {
+            if ( [delegate respondsToSelector:@selector(peripheral:didUpdateValueForCharacteristic:error:)] )
+            {
+                NSString * domain = [NSString stringWithFormat:@"%@ 读取数据失败，未找到 %@ 特征", deviceName, characteristicUUID];
+                NSError * err = [NSError errorWithDomain:domain code:10086 userInfo:nil];
+                [delegate peripheral:peripheral didUpdateValueForCharacteristic:characteristic error:err];
+            }
+        }
+        
         return;
     }
     
@@ -881,10 +895,24 @@ static FLYBluetoothManager * _manager;
     // 获取特征
     CBCharacteristic * characteristic = [self getCharacteristicsWithPeripheral:peripheral characteristicUUID:characteristicUUID];
     
-    // 特征的UUID都是开发时和硬件部门定好的，不存在找不到的情况，所以这里不需要搞失败的回调。
     if ( characteristic == nil )
     {
-        NSLog(@"写入数据失败，未找到 %@ 特征", characteristicUUID);
+        NSLog(@"%@ 写入数据失败，未找到 %@ 特征", deviceName, characteristicUUID);
+        
+        // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
+        NSHashTable * tempDelegates = self.delegates.copy;
+        
+        // 遍历所有代理，并执行回调
+        for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
+        {
+            if ( [delegate respondsToSelector:@selector(peripheral:didWriteValueForCharacteristic:error:)] )
+            {
+                NSString * domain = [NSString stringWithFormat:@"%@ 写入数据失败，未找到 %@ 特征", deviceName, characteristicUUID];
+                NSError * err = [NSError errorWithDomain:domain code:10086 userInfo:nil];
+                [delegate peripheral:peripheral didWriteValueForCharacteristic:characteristic error:err];
+            }
+        }
+        
         return;
     }
     

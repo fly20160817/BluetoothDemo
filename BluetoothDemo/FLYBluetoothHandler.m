@@ -16,6 +16,7 @@ const NSErrorDomain domain5 = @"连接外设失败";
 const NSErrorDomain domain6 = @"意外断开连接";
 const NSErrorDomain domain7 = @"写入数据报错";
 const NSErrorDomain domain8 = @"读取数据报错";
+const NSErrorDomain domain9 = @"未找到指定特征";
 
 
 @interface FLYCommand : NSObject
@@ -352,6 +353,29 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
         }
         
     }
+    
+    
+    
+    // 特征是否全部扫描完成
+    BOOL isScanFinish = YES;
+    
+    for ( CBService * tempService in peripheral.services)
+    {
+        // 如果有服务的特征等于nil，说明特征还没扫描完，这个代理还会继续调用
+        if ( tempService.characteristics == nil )
+        {
+            isScanFinish = NO;
+        }
+    }
+    
+    // 如果遍历完所有特征，都没找到待执行命令的特征
+    if ( isScanFinish == YES && self.command != nil && self.command.commandType != FLYCommandTypeNone )
+    {
+        // 10086 代表没找到特征
+        NSError * err = [NSError errorWithDomain:domain9 code:FLYBluetoothErrorCodeCharacteristicUUID userInfo:nil];
+        !self.failure ?: self.failure(err);
+        [self reset];
+    }
 
 }
 
@@ -384,7 +408,8 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
         
         if ( error )
         {
-            NSError * err = [NSError errorWithDomain:domain8 code:FLYBluetoothErrorCodeRead userInfo:nil];
+            // 10086 代表没找到特征
+            NSError * err = [NSError errorWithDomain:error.code == 10086 ? domain9 : domain8 code:error.code == 10086 ? FLYBluetoothErrorCodeCharacteristicUUID : FLYBluetoothErrorCodeRead userInfo:nil];
             !self.failure ?: self.failure(err);
             [self reset];
         }
@@ -408,7 +433,8 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     
     if ( error )
     {
-        NSError * err = [NSError errorWithDomain:domain7 code:FLYBluetoothErrorCodeWrite userInfo:nil];
+        // 10086 代表没找到特征
+        NSError * err = [NSError errorWithDomain:error.code == 10086 ? domain9 : domain7 code:error.code == 10086 ? FLYBluetoothErrorCodeCharacteristicUUID : FLYBluetoothErrorCodeWrite userInfo:nil];
         !self.failure ?: self.failure(err);
         [self reset];
         return;

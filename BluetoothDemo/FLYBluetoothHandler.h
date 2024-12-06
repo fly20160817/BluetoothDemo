@@ -39,6 +39,7 @@ typedef NS_ENUM(NSInteger, FLYBluetoothErrorCode)
     FLYBluetoothErrorCodeDisconnect = 6,        //意外断开连接
     FLYBluetoothErrorCodeWrite = 7,             //写入数据报错
     FLYBluetoothErrorCodeRead = 8,              //读取数据报错
+    FLYBluetoothErrorCodeCharacteristicUUID = 9,//未找到指定特征
 };
 
 typedef NS_ENUM(NSInteger, FLYBluetoothProgress) {
