@@ -375,6 +375,13 @@ static FLYBluetoothManager * _manager;
 // 扫描到外设的服务时回调 (即使有多个服务，也只会回调一次，拿到的是数组，所有的服务都在里面)
 - (void)peripheral:(CBPeripheral *)peripheral didDiscoverServices:(nullable NSError *)error
 {
+    /*
+     Core Bluetooth 会缓存设备已发现的服务列表，如果服务列表内容有变动（例如设备固件更新导致服务发生改变），
+     需要去设置里关闭并重新打开蓝牙才能搜索到新的服务。
+     */
+    
+    
+    
     if( error )
     {
         NSLog(@"%@ 扫描服务出错：%@", peripheral.subName ? peripheral.subName : peripheral.name, error);
