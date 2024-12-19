@@ -224,8 +224,12 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
         {
             if ( self.isShowAlert )
             {
-                UIAlertController * alertController = [UIAlertController alertControllerWithTitle:@"蓝牙已关闭" message:@"请前往设置中开启蓝牙" preferredStyle:UIAlertControllerStyleAlert titles:@[@"确定"] alertAction:^(NSInteger index) {}];
-                [alertController show];
+                // app在前台的时候才弹窗 (防止用户在后台，把蓝牙关了，此时app已经触发了这个弹窗，然后用户又把蓝牙开了，然后回到app，此时弹窗却出来了，但此时的蓝牙实际上是开的) （上面蓝牙权限的方法无需此处理，因为切换权限会导致应用被系统强制杀死，不存在回到前台的情况）
+                if ( [UIApplication sharedApplication].applicationState == UIApplicationStateActive )
+                {
+                    UIAlertController * alertController = [UIAlertController alertControllerWithTitle:@"蓝牙已关闭" message:@"请前往设置中开启蓝牙" preferredStyle:UIAlertControllerStyleAlert titles:@[@"确定"] alertAction:^(NSInteger index) {}];
+                    [alertController show];
+                }
             }
             
             NSError * error = [NSError errorWithDomain:domain1 code:FLYBluetoothErrorCodePoweredOff userInfo:nil];
