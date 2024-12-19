@@ -7,6 +7,7 @@
 
 #import "FLYBluetoothHandler.h"
 #import "UIAlertController+FLYExtension.h"
+#import "FLYTools.h"
 
 const NSErrorDomain domain1 = @"蓝牙未打开";
 const NSErrorDomain domain2 = @"蓝牙权限被禁";
@@ -189,7 +190,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
         {
             if ( self.isShowAlert )
             {
-                UIAlertController * alertController = [UIAlertController alertControllerWithTitle:@"提示" message:@"您的设备无法使用蓝牙功能" preferredStyle:UIAlertControllerStyleAlert titles:@[@"确定"] alertAction:^(NSInteger index) {}];
+                UIAlertController * alertController = [UIAlertController alertControllerWithTitle:LS(@"蓝牙不支持") message:LS(@"您的设备不支持蓝牙功能") preferredStyle:UIAlertControllerStyleAlert titles:@[LS(@"确定")] alertAction:^(NSInteger index) {}];
                 [alertController show];
             }
             
@@ -204,7 +205,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
         {
             if ( self.isShowAlert )
             {
-                UIAlertController * alertController = [UIAlertController alertControllerWithTitle:@"提示" message:@"您已关闭蓝牙权限，请打开蓝牙权限" preferredStyle:UIAlertControllerStyleAlert titles:@[@"取消", @"去打开"] alertAction:^(NSInteger index) {
+                UIAlertController * alertController = [UIAlertController alertControllerWithTitle:LS(@"蓝牙权限未开启") message:LS(@"应用未获得蓝牙授权，请前往设置开启。") preferredStyle:UIAlertControllerStyleAlert titles:@[LS(@"取消"), LS(@"前往设置")] alertAction:^(NSInteger index) {
                     if ( index == 1 )
                     {
                         NSURL *settingsURL = [NSURL URLWithString:UIApplicationOpenSettingsURLString];
@@ -224,10 +225,10 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
         {
             if ( self.isShowAlert )
             {
-                // app在前台的时候才弹窗 (防止用户在后台，把蓝牙关了，此时app已经触发了这个弹窗，然后用户又把蓝牙开了，然后回到app，此时弹窗却出来了，但此时的蓝牙实际上是开的) （上面蓝牙权限的方法无需此处理，因为切换权限会导致应用被系统强制杀死，不存在回到前台的情况）
+                // app在前台的时候才弹窗 (防止用户在后台，把蓝牙关了，此时app已经触发了这个弹窗，然后用户又把蓝牙开了，然后回到app，此时弹窗却出来了，但此时的蓝牙实际上是开的) （上面蓝牙权限的方法为什么不这么写呢，因为开关权限会杀死app，不存在再次回到前台的情况）
                 if ( [UIApplication sharedApplication].applicationState == UIApplicationStateActive )
                 {
-                    UIAlertController * alertController = [UIAlertController alertControllerWithTitle:@"蓝牙已关闭" message:@"请前往设置中开启蓝牙" preferredStyle:UIAlertControllerStyleAlert titles:@[@"确定"] alertAction:^(NSInteger index) {}];
+                    UIAlertController * alertController = [UIAlertController alertControllerWithTitle:LS(@"蓝牙已关闭") message:LS(@"请在设置中开启蓝牙") preferredStyle:UIAlertControllerStyleAlert titles:@[LS(@"确定")] alertAction:^(NSInteger index) {}];
                     [alertController show];
                 }
             }
