@@ -194,6 +194,16 @@ static FLYBluetoothManager * _manager;
                 
                 [self connectPeripheral:peripheral];
             }
+            // 有的时候同名设备太多，不能更具名字来，广播地址里又没有mac，只能用identifier来区分设备
+            else if ( [peripheral.identifier.UUIDString isEqualToString:connectModel.connectName] )
+            {
+                // 保存广播里的这个值
+                peripheral.subName = peripheral.identifier.UUIDString;
+                //peripheral必须保存起来才能连接，不然会被释放。
+                connectModel.peripheral = peripheral;
+            
+                [self connectPeripheral:peripheral];
+            }
             else
             {
                 //遍历广播字典里的所有value，如果能和传进来的name匹配，则停止扫描并连接 (因为传进来的可能是mac，在广播里找找)
