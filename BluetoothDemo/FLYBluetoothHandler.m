@@ -376,7 +376,6 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     // 如果遍历完所有特征，都没找到待执行命令的特征
     if ( isScanFinish == YES && self.command != nil && self.command.commandType != FLYCommandTypeNone )
     {
-        // 10086 代表没找到特征
         NSError * err = [NSError errorWithDomain:domain9 code:FLYBluetoothErrorCodeCharacteristicUUID userInfo:nil];
         !self.failure ?: self.failure(err);
         [self reset];

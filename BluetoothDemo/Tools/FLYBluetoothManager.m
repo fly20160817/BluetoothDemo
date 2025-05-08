@@ -286,7 +286,7 @@ static FLYBluetoothManager * _manager;
 - (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)peripheral
 {
     NSLog(@"连接外设成功：%@", peripheral);
-    
+
     
     //扫描服务
     [peripheral discoverServices:nil];
@@ -315,6 +315,11 @@ static FLYBluetoothManager * _manager;
     NSLog(@"连接外设失败：%@, error：%@", peripheral, error);
     
     
+    // 从数组中删除
+    FLYConnectModel * connectModel = [self getConnectModelForPeripheral:peripheral];
+    [self.connectModels removeObject:connectModel];
+    
+    
     // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
     NSHashTable * tempDelegates = self.delegates.copy;
     
@@ -326,11 +331,6 @@ static FLYBluetoothManager * _manager;
             [delegate bluetoothManager:self didFailToConnectPeripheral:peripheral error:error];
         }
     }
-    
-    
-    // 从数组中删除
-    FLYConnectModel * connectModel = [self getConnectModelForPeripheral:peripheral];
-    [self.connectModels removeObject:connectModel];
 }
 
 //断开外设连接
@@ -482,7 +482,6 @@ static FLYBluetoothManager * _manager;
         {
              NSLog(@"%@ 特征具有通知属性", characteristic.UUID);
 
-             
             // 开启特征值的通知 (开启通知后，在 peripheral:didUpdateValueForCharacteristic:error: 代理中监听特征值的更新通知。)
             [peripheral setNotifyValue:YES forCharacteristic:characteristic];
         }
@@ -774,18 +773,6 @@ static FLYBluetoothManager * _manager;
     }
     
     
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(bluetoothManager:connectingPeripheral:)] )
-        {
-            [delegate bluetoothManager:self connectingPeripheral:peripheral];
-        }
-    }
-        
     
     //连接外围设备
     [self.centralManager connectPeripheral:peripheral options:nil];
@@ -799,6 +786,20 @@ static FLYBluetoothManager * _manager;
     if ( [self isUnconnected] == NO && self.centralManager.isScanning )
     {
         [self stopScan];
+    }
+    
+    
+    
+    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
+    NSHashTable * tempDelegates = self.delegates.copy;
+    
+    // 遍历所有代理，并执行回调
+    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
+    {
+        if ( [delegate respondsToSelector:@selector(bluetoothManager:connectingPeripheral:)] )
+        {
+            [delegate bluetoothManager:self connectingPeripheral:peripheral];
+        }
     }
 }
 
