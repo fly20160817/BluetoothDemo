@@ -306,13 +306,12 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 }
 
 // 扫描超时
--(void)bluetoothManagerDidTimeout:(FLYBluetoothManager *)central
+-(void)bluetoothManager:(FLYBluetoothManager *)central didTimeoutForDeviceName:(NSString *)deviceName
 {
-    if ( self.command.deviceName == nil )
+    if ( self.command.deviceName != deviceName )
     {
         return;
     }
-    
     
     NSError * err = [NSError errorWithDomain:domain4 code:FLYBluetoothErrorCodeTimeout userInfo:nil];
     !self.failure ?: self.failure(err);
