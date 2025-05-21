@@ -33,7 +33,7 @@
     _deviceName = @"QJB2";
     
     
-    [[FLYBluetoothHandler sharedHandler] bluetoothDidUpdateValueForCharacteristic:^(CBPeripheral * _Nonnull peripheral, CBCharacteristic * _Nonnull characteristic, NSError * _Nonnull error) {
+    [[FLYBluetoothHandler sharedHandler] addCharacteristicValueUpdateCallbackWithOwner:self callback:^(CBPeripheral * _Nonnull peripheral, CBCharacteristic * _Nonnull characteristic, NSError * _Nonnull error) {
         
         if ( [peripheral.name isEqualToString:self->_deviceName] || [peripheral.subName isEqualToString:self->_deviceName] )
         {

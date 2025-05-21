@@ -10,8 +10,6 @@
  
  本类对 FLYBluetoothManager 进行了封装，外界可以直接进行读取和写入操作。
  
- ❗️外界不能同时调用多个方法，方法只能一个一个调用，等一个方法有回调了，才能继续调用。不然只会执行最后调用的方法。(因为是单利，多次调用会覆盖内部接收的block参数)
- 
  蓝牙状态判断、扫描设备、连接设备、扫描服务、扫描特征，全部都在内部实现了，外界无需过问。如果中间哪一步报错了，会在failure回调里返回错误原因，外界可以根据error的Code进行处理或弹窗提示。(蓝牙没开、授权没开，这两种错误内部进行了弹窗，如果样式不符合需求，可以通过showAlert属性关闭弹窗，外界重新写弹窗即可)
  
  断开连接需要使用FLYBluetoothManager类进行操作。
@@ -84,9 +82,11 @@ typedef void(^BLEUpdateValueBlock)(CBPeripheral * peripheral, CBCharacteristic *
 - (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(nullable BLESuccessBlock)success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress;
 
 
-/// 特征里的值更新时回调
-/// - Parameter value: 回调返回的数据
-- (void)bluetoothDidUpdateValueForCharacteristic:(BLEUpdateValueBlock)updateValue;
+/// 添加一个特征值更新的回调
+/// - Parameters:
+///   - owner: 回调绑定的对象（通常传 self，即调用者本身。由于本类为单例，添加回调后无法主动判断何时移除，因此通过绑定 owner 的生命周期，在 owner 释放后自动移除对应回调，避免回调在对象已销毁后仍被触发）
+///   - callback: 特征值更新时触发的回调
+- (void)addCharacteristicValueUpdateCallbackWithOwner:(id)owner callback:(BLEUpdateValueBlock)callback;
 
 
 @end

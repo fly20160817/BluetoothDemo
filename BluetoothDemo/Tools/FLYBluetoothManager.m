@@ -26,6 +26,9 @@
     自动移除：
         NSHashTable 可以通过设置为弱引用来自动移除其中的对象，避免悬挂指针（野指针）问题。
  
+ 
+ 这里不要用 NSPointerArray ，它是有序数组，不会去重，不会自动清理已释放对象，会留下 NULL 占位。
+ 
  *************************************************************************/
 
 @interface FLYBluetoothManager () < CBCentralManagerDelegate, CBPeripheralDelegate >
@@ -650,6 +653,7 @@ static FLYBluetoothManager * _manager;
         {
             [connectModel stopTimer];
         }
+        NSLog(@"此设备已执行过扫描并连接，删除多余的connectModel");
         [self.connectModels removeObject:connectModel];
     }
     
@@ -944,19 +948,33 @@ static FLYBluetoothManager * _manager;
      */
 
     
-    // 这两个属性它们是互斥的。一个特征只能具有其中的一种属性，不可能同时具有这两个属性。
-    
-    // 默认是 需要外设返回响应 类型
-    CBCharacteristicWriteType writeType = CBCharacteristicWriteWithResponse;
-    
-    // 如果特征具有无需响应的写入属性，则改为 无需外设返回响应 类型
-    if (characteristic.properties & CBCharacteristicPropertyWriteWithoutResponse)
+
+    // 优先使用带响应的写入方式（如果支持）
+    if (characteristic.properties & CBCharacteristicPropertyWrite)
     {
-        writeType = CBCharacteristicWriteWithoutResponse;
+        [peripheral writeValue:data forCharacteristic:characteristic type:CBCharacteristicWriteWithResponse];
     }
-    
-    [peripheral writeValue:data forCharacteristic:characteristic type:writeType];
-    
+    // 否则使用无响应写入方式（如果支持）
+    else if (characteristic.properties & CBCharacteristicPropertyWriteWithoutResponse)
+    {
+        [peripheral writeValue:data forCharacteristic:characteristic type:CBCharacteristicWriteWithoutResponse];
+        
+        
+        /* 无需响应的写入，是没有成功和失败的回调的，这里手动调用写入成功的回调，让外界知道已经写完了。 外界的指令队列就可以执行下一条了*/
+        
+        // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
+        NSHashTable * tempDelegates = self.delegates.copy;
+        
+        // 遍历所有代理，并执行回调
+        for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
+        {
+            if ( [delegate respondsToSelector:@selector(peripheral:didWriteValueForCharacteristic:error:)] )
+            {
+                [delegate peripheral:peripheral didWriteValueForCharacteristic:characteristic error:nil];
+            }
+        }
+    }
+        
 }
 
 // 开启或关闭特征值的通知
@@ -1110,11 +1128,5 @@ static FLYBluetoothManager * _manager;
 
 
 @end
-
-
-
-
-
-
 
 
