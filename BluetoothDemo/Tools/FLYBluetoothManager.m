@@ -248,6 +248,7 @@ static FLYBluetoothManager * _manager;
                             connectModel.peripheral = peripheral;
                             
                             [self connectPeripheral:peripheral];
+                            break;
                         }
                     }
                 }
