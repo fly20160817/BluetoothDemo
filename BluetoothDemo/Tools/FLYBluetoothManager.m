@@ -225,41 +225,32 @@ static FLYBluetoothManager * _manager;
                             break;
                         }
                     }
-                }
-                
-                
-                
-                /**********************************************************/
-                // R7 的 mac 在 kCBAdvDataManufacturerData 里，上面的代码拿不到，为了取R7的mac，单独加的代码
-                
-                NSData *manufacturerData = advertisementData[@"kCBAdvDataManufacturerData"];
-           
-                // 截取第8位往后6位，为mac地址 （R7的8～13位是mac）
-                if (manufacturerData.length > 14)
-                {
-                    NSRange macRange = NSMakeRange(7, 6);
-                    NSData *macData = [manufacturerData subdataWithRange:macRange];
-                    
-                    NSMutableString *macString = [NSMutableString stringWithCapacity:12];
-                    const unsigned char *dataBytes = macData.bytes;
-                    for (NSInteger i = 0; i < macData.length; i++)
+                    else if ( [value isKindOfClass:[NSData class]] )
                     {
-                        [macString appendFormat:@"%02x", dataBytes[i]];
+                        NSData *data = (NSData *)value;
+                        
+                        NSMutableString *hexString = [NSMutableString string];
+                        const unsigned char *dataBytes = data.bytes;
+                        
+                        for (NSInteger i = 0; i < data.length; i++)
+                        {
+                            // x 是小写
+                            [hexString appendFormat:@"%02x", dataBytes[i]];
+                        }
+                        
+                        // 转换 connectName 为小写进行比较（防止大小写不一致）
+                        NSString *targetName = [connectModel.connectName lowercaseString];
+                        
+                        // 如果 kCBAdvDataManufacturerData 包含 connectName，则去连接 (kCBAdvDataManufacturerData里面可能除了mac，还有其他的一些数据，所以用包好，不用等于)
+                        if ([hexString containsString:targetName])
+                        {
+                            peripheral.subName = hexString;
+                            connectModel.peripheral = peripheral;
+                            
+                            [self connectPeripheral:peripheral];
+                        }
                     }
-                    
-                    if ( [macString isEqualToString:connectModel.connectName] )
-                    {
-                        // 保存广播里的这个值
-                        peripheral.subName = macString;
-                        //peripheral必须保存起来才能连接，不然会被释放。
-                        connectModel.peripheral = peripheral;
-                    
-                        [self connectPeripheral:peripheral];
-                    }
-                    NSLog(@"mac地址: %@, manufacturerData = %@", macString, manufacturerData);
                 }
-                
-                /**********************************************************/
                 
             }
         }
