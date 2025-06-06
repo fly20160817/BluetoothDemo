@@ -244,7 +244,7 @@ static FLYBluetoothManager * _manager;
                         // 如果 kCBAdvDataManufacturerData 包含 connectName，则去连接 (kCBAdvDataManufacturerData里面可能除了mac，还有其他的一些数据，所以用包好，不用等于)
                         if ([hexString containsString:targetName])
                         {
-                            peripheral.subName = hexString;
+                            peripheral.subName = connectModel.connectName;
                             connectModel.peripheral = peripheral;
                             
                             [self connectPeripheral:peripheral];
