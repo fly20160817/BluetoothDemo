@@ -298,22 +298,41 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 // 断开连接
 -(void)bluetoothManager:(FLYBluetoothManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error
 {
-    if ( ![self.currentCommand.deviceName isEqualToString:peripheral.name] && ![self.currentCommand.deviceName isEqualToString:peripheral.subName] )
-    {
-        return;
-    }
+    // 断开连接之后，移除这个设备的所有未执行的指令 (因为是指令队列，它断开了没执行，会卡住队列，后续其他设备的指令也无法执行)
+    [self.commandList enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(FLYCommand * command, NSUInteger idx, BOOL * _Nonnull stop) {
+        
+        if ( [command.deviceName isEqualToString:peripheral.name] || [self.currentCommand.deviceName isEqualToString:peripheral.subName] )
+        {
+            NSLog(@"设备断开，移除未执行的指令");
+            [self.commandList removeObject:command];
+        }
+    }];
     
     
-    if ( error )
+    
+    if ( [self.currentCommand.deviceName isEqualToString:peripheral.name] || [self.currentCommand.deviceName isEqualToString:peripheral.subName] )
     {
-        NSError * err = [NSError errorWithDomain:domain6 code:FLYBluetoothErrorCodeDisconnect userInfo:nil];
-        [self handleFailureWithError:err];
+        if ( error )
+        {
+            NSError * err = [NSError errorWithDomain:domain6 code:FLYBluetoothErrorCodeDisconnect userInfo:nil];
+            [self handleFailureWithError:err];
+        }
+        else
+        {
+            // 只有正常断开的才执行进度回调，意外断开属于错误，不属于进度。
+            !self.currentCommand.progress ?: self.currentCommand.progress(FLYBluetoothProgressDisconnected);
+            
+            
+            /*
+             正常断开，既不会执行成功回调，也不会执行失败回调，因为它既不算成功，也不算失败，毕竟是用户主动调用的断开。
+             但是它不执行回调，就会卡住指令队列，无法执行下一个执行，所以要手动调用继续下一个指令。(不用担心当前未回调的指令，会在上面的遍历中移除)
+             */
+            
+            // 继续下一个指令
+            [self continueToNextCommand];
+        }
     }
-    else
-    {
-        // 只有正常断开的才执行进度回调，意外断开属于错误，不属于进度。
-        !self.currentCommand.progress ?: self.currentCommand.progress(FLYBluetoothProgressDisconnected);
-    }
+
 }
 
 // 扫描超时
@@ -513,14 +532,9 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     // 执行回调
     !self.currentCommand.success ?: self.currentCommand.success(data);
     
-    // 清空当前指令
-    self.currentCommand = nil;
     
-    // 调用下一个指令
-    if ( self.commandList.count > 0 )
-    {
-        [self executeCommand];
-    }
+    // 继续下一个指令
+    [self continueToNextCommand];
     
 }
 
@@ -534,6 +548,15 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     // 执行回调
     !self.currentCommand.failure ?: self.currentCommand.failure(error);
     
+    
+    // 继续下一个指令
+    [self continueToNextCommand];
+    
+}
+
+// 继续下一个指令
+- (void)continueToNextCommand
+{
     // 清空当前指令
     self.currentCommand = nil;
     
@@ -542,7 +565,6 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     {
         [self executeCommand];
     }
-    
 }
 
 
