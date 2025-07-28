@@ -36,7 +36,9 @@
 
 - (IBAction)scanAndConnect:(UIButton *)sender
 {
-    [[FLYBluetoothManager sharedManager] scanAndConnect:self.nameTF.text timeout:0];
+    FLYService * service = [FLYService serviceWithUUID:@"FAA0" characteristics:@[@"FAA1", @"FAA2"]];
+
+    [[FLYBluetoothManager sharedManager] scanAndConnect:self.nameTF.text services:@[service] timeout:0];
 }
 
 - (IBAction)writeData:(UIButton *)sender
@@ -45,7 +47,7 @@
     NSData * data = [dateString dataUsingEncoding:NSUTF8StringEncoding];
     
     
-    [[FLYBluetoothManager sharedManager] writeWithDeviceName:self.nameTF.text data:data characteristicUUID:self.uuidTF.text];
+    [[FLYBluetoothManager sharedManager] writeWithDeviceName:self.nameTF.text data:data serviceUUID:@"FAA0" characteristicUUID:self.uuidTF.text];
 }
 
 
@@ -73,3 +75,4 @@
 
 
 @end
+

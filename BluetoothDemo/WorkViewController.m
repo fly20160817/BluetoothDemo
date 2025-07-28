@@ -51,7 +51,7 @@
     NSString * dateString = @"11open";
     NSData * data = [dateString dataUsingEncoding:NSUTF8StringEncoding];
     
-    [[FLYBluetoothHandler sharedHandler] bluetoothWriteWithDeviceName:_deviceName data:data characteristicUUID:@"36F5" success:^() {
+    [[FLYBluetoothHandler sharedHandler] bluetoothWriteWithDeviceName:_deviceName services:nil data:data serviceUUID:@"FAA0" characteristicUUID:@"36F5" success:^() {
         
         NSLog(@"第二页_写入成功");
         
@@ -68,7 +68,7 @@
 }
 - (IBAction)kaisuo2:(UIButton *)sender
 {
-    [[FLYBluetoothHandler sharedHandler] bluetoothReadWithDeviceName:_deviceName characteristicUUID:@"36F6" success:^(NSData * _Nullable data) {
+    [[FLYBluetoothHandler sharedHandler] bluetoothReadWithDeviceName:_deviceName services:nil serviceUUID:@"FAA0" characteristicUUID:@"36F6" success:^(NSData * _Nullable data) {
         
         NSLog(@"第二页_读取成功：%@", data);
         
@@ -85,3 +85,4 @@
 
 
 @end
+

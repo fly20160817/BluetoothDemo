@@ -29,6 +29,8 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 };
 
 @property (nonatomic, strong) NSString * deviceName;
+@property (nonatomic, strong, nullable) NSArray<FLYService *> * services;
+@property (nonatomic, strong) NSString * serviceUUID;
 @property (nonatomic, strong) NSString * characteristicUUID;
 @property (nonatomic, assign) FLYCommandType commandType;
 @property (nonatomic, strong) NSData * data;
@@ -125,11 +127,13 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 
 
 /// 往特征里写入数据
-- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(nullable void (^)(void))success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress
+- (void)bluetoothWriteWithDeviceName:(NSString *)name services:(nullable NSArray<FLYService *> *)services data:(NSData *)data serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID success:(nullable void (^)(void))success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress
 {
     // 保存传进来的数据
     FLYCommand * command = [[FLYCommand alloc] init];
     command.deviceName = name;
+    command.services = services;
+    command.serviceUUID = serviceUUID;
     command.characteristicUUID = characteristicUUID;
     command.data = data;
     command.commandType = FLYCommandTypeWrite;
@@ -145,11 +149,13 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 }
 
 /// 读取特征的值
-- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(nullable BLESuccessBlock)success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress
+- (void)bluetoothReadWithDeviceName:(NSString *)name services:(nullable NSArray<FLYService *> *)services serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID success:(nullable BLESuccessBlock)success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress
 {
     // 保存传进来的数据
     FLYCommand * command = [[FLYCommand alloc] init];
     command.deviceName = name;
+    command.services = services;
+    command.serviceUUID = serviceUUID;
     command.characteristicUUID = characteristicUUID;
     command.commandType = FLYCommandTypeRead;
     command.success = success;
@@ -361,7 +367,8 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     for (CBCharacteristic * characteristic in service.characteristics )
     {
         // 如果有未执行的命令，则执行
-        if ( [self.currentCommand.characteristicUUID isEqualToString:characteristic.UUID.UUIDString] && self.currentCommand.commandType != FLYCommandTypeNone )
+        // 使用 CBUUID 对象比较，避免短 UUID 和完整 UUID 字符串在格式上不一致而导致比较失败
+        if ( [[CBUUID UUIDWithString:self.currentCommand.characteristicUUID] isEqual:characteristic.UUID] && self.currentCommand.commandType != FLYCommandTypeNone )
         {
             [self sendCommand];
         }
@@ -424,7 +431,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     
     
     // 因为读取前先把通知给关闭，所以这里收到到数据后在给它打开。
-    [[FLYBluetoothManager sharedManager] setNotifyValue:YES forDeviceName:self.currentCommand.deviceName characteristicUUID:self.currentCommand.characteristicUUID];
+    [[FLYBluetoothManager sharedManager] setNotifyValue:YES forDeviceName:self.currentCommand.deviceName serviceUUID:self.currentCommand.serviceUUID characteristicUUID:self.currentCommand.characteristicUUID];
     
     
     if ( error )
@@ -502,7 +509,7 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     
     
     !self.currentCommand.progress ?: self.currentCommand.progress(FLYBluetoothProgressScanning);
-    [[FLYBluetoothManager sharedManager] scanAndConnect:self.currentCommand.deviceName timeout:60];
+    [[FLYBluetoothManager sharedManager] scanAndConnect:self.currentCommand.deviceName services:self.currentCommand.services timeout:60];
 }
 
 // 发送命令
@@ -510,14 +517,14 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
 {
     if ( self.currentCommand.commandType == FLYCommandTypeWrite )
     {
-        [[FLYBluetoothManager sharedManager] writeWithDeviceName:self.currentCommand.deviceName data:self.currentCommand.data characteristicUUID:self.currentCommand.characteristicUUID];
+        [[FLYBluetoothManager sharedManager] writeWithDeviceName:self.currentCommand.deviceName data:self.currentCommand.data serviceUUID:self.currentCommand.serviceUUID characteristicUUID:self.currentCommand.characteristicUUID];
     }
     else if ( self.currentCommand.commandType == FLYCommandTypeRead )
     {
         // 读取前先把通知给关闭，不然回调里不能区分是读取的回调还是通知的回调。(回调收到数据后会重新打开)
-        [[FLYBluetoothManager sharedManager] setNotifyValue:NO forDeviceName:self.currentCommand.deviceName characteristicUUID:self.currentCommand.characteristicUUID];
+        [[FLYBluetoothManager sharedManager] setNotifyValue:NO forDeviceName:self.currentCommand.deviceName serviceUUID:self.currentCommand.serviceUUID characteristicUUID:self.currentCommand.characteristicUUID];
         
-        [[FLYBluetoothManager sharedManager] readWithDeviceName:self.currentCommand.deviceName characteristicUUID:self.currentCommand.characteristicUUID];
+        [[FLYBluetoothManager sharedManager] readWithDeviceName:self.currentCommand.deviceName serviceUUID:self.currentCommand.serviceUUID characteristicUUID:self.currentCommand.characteristicUUID];
     }
     
     // 执行完之后把操作类型设置成无

@@ -7,6 +7,7 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CoreBluetooth.h>
+#import "FLYService.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -14,6 +15,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 保存扫描并连接的name
 @property (nonatomic, strong) NSString * connectName;
+
+/// 需要扫描的服务和特征
+@property (nonatomic, strong, nullable) NSArray<FLYService *> * services;
 
 /// 外设对象
 @property(nonatomic, strong) CBPeripheral * peripheral;

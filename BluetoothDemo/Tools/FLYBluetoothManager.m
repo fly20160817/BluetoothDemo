@@ -8,6 +8,7 @@
 
 #import "FLYBluetoothManager.h"
 #import "FLYConnectModel.h"
+#import "FLYBluetoothManager+Helper.h"
 
 
 /***************************** NSHashTable *****************************
@@ -31,7 +32,7 @@
  
  *************************************************************************/
 
-@interface FLYBluetoothManager () < CBCentralManagerDelegate, CBPeripheralDelegate >
+@interface FLYBluetoothManager ()
 
 // 存放代理对象的数组 (本单例类中实现了一对多的代理，即一个单例类可以有多个代理对象)
 @property (nonatomic, strong) NSHashTable<id<FLYBluetoothManagerDelegate>> * delegates;
@@ -75,10 +76,13 @@ static FLYBluetoothManager * _manager;
         //weakObjectsHashTable方法创建的 NSHashTable 对象中，存储的对象是弱引用，也就是说，当存储在该表中的对象被释放时，表会自动将其从集合中移除，避免了出现悬挂指针（野指针）的问题。
         self.delegates = [NSHashTable weakObjectsHashTable];
         
-        self.reconnect = YES;
+        self.connectModels = [NSMutableArray array];
         
+        self.reconnect = YES;
+       
         //queue:队列 (传nil就代表在主队列) (不要使用懒加载，早点加载早点拿到蓝牙状态)
-        self.centralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil];
+        // 因为代理在分类里实现，直接写 self 会警告未遵守代理，强转一下就没有警告了。
+        self.centralManager = [[CBCentralManager alloc] initWithDelegate:(id<CBCentralManagerDelegate>)self queue:nil];
     }
     return self;
 }
@@ -110,488 +114,6 @@ static FLYBluetoothManager * _manager;
 
 
 
-#pragma mark - CBCentralManagerDelegate 中央管理者代理
-
-//判断设备的更新状态 (必须执行的代理)
-- (void)centralManagerDidUpdateState:(CBCentralManager *)central
-{
-    switch (central.state)
-    {
-        case CBManagerStateUnknown:
-            NSLog(@"蓝牙状态未知");
-            break;
-            
-        case CBManagerStateResetting:
-            NSLog(@"蓝牙正在重置");
-            break;
-            
-        case CBManagerStateUnsupported:
-            NSLog(@"蓝牙硬件损坏");
-            break;
-            
-        case CBManagerStateUnauthorized:
-            NSLog(@"蓝牙权限被禁");
-            break;
-            
-        case CBManagerStatePoweredOff:
-            NSLog(@"蓝牙已关闭");
-            break;
-            
-        case CBManagerStatePoweredOn:
-        {
-            NSLog(@"蓝牙已开启");
-            
-            //如果扫描的状态是YES，则开启扫描（防止调用扫描时，iPhone蓝牙没开导致扫描失败，此时打开蓝牙，蓝牙状态变化，这里我们判断是否正在扫描中，如果是就自动开始扫描）
-            if( self.isScanning )
-            {
-                [self startScan];
-            }
-        }
-            break;
-            
-        default:
-            break;
-    }
-    
-    self.state = central.state;
-    
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(bluetoothManagerDidUpdateState:)] )
-        {
-            [delegate bluetoothManagerDidUpdateState:central.state];
-        }
-    }
-}
-
-/**
- 当发现外围设备时，会调用的方法
-
- @param central 中央管理者
- @param peripheral 外围设备
- @param advertisementData 相关的数据
- @param RSSI 信号强度
- */
-- (void)centralManager:(CBCentralManager *)central didDiscoverPeripheral:(CBPeripheral *)peripheral advertisementData:(NSDictionary<NSString *,id> *)advertisementData RSSI:(NSNumber *)RSSI
-{
-    /* 已经连接的设备是扫描不到的 */
-    
-    NSLog(@"扫描到外设：%@", peripheral);
-     
-    
-    for ( FLYConnectModel * connectModel in self.connectModels)
-    {
-        // 是否有扫描并连接的name
-        if ( connectModel.connectName )
-        {
-            //如果需要连接的name等于外围设备name，则停止扫描并连接
-            if ( [peripheral.name isEqualToString:connectModel.connectName] )
-            {
-                //peripheral必须保存起来才能连接，不然会被释放。
-                connectModel.peripheral = peripheral;
-                
-                [self connectPeripheral:peripheral];
-            }
-            // 有的时候同名设备太多，不能根据名字来，广播地址里又没有mac，只能用identifier来区分设备
-            else if ( [peripheral.identifier.UUIDString isEqualToString:connectModel.connectName] )
-            {
-                // 保存广播里的这个值
-                peripheral.subName = peripheral.identifier.UUIDString;
-                //peripheral必须保存起来才能连接，不然会被释放。
-                connectModel.peripheral = peripheral;
-            
-                [self connectPeripheral:peripheral];
-            }
-            else
-            {
-                //遍历广播字典里的所有value，如果能和传进来的name匹配，则停止扫描并连接 (因为传进来的可能是mac，在广播里找找)
-                for (id value in advertisementData.allValues)
-                {
-                    if ( [value isKindOfClass:[NSString class]] )
-                    {
-                        if ( [value isEqualToString:connectModel.connectName] )
-                        {
-                            // 保存广播里的这个值
-                            peripheral.subName = value;
-                            //peripheral必须保存起来才能连接，不然会被释放。
-                            connectModel.peripheral = peripheral;
-                        
-                            [self connectPeripheral:peripheral];
-                            break;
-                        }
-                    }
-                    else if ( [value isKindOfClass:[NSData class]] )
-                    {
-                        NSData *data = (NSData *)value;
-                        
-                        NSMutableString *hexString = [NSMutableString string];
-                        const unsigned char *dataBytes = data.bytes;
-                        
-                        for (NSInteger i = 0; i < data.length; i++)
-                        {
-                            // x 是小写
-                            [hexString appendFormat:@"%02x", dataBytes[i]];
-                        }
-                        
-                        // 转换 connectName 为小写进行比较（防止大小写不一致）
-                        NSString *targetName = [connectModel.connectName lowercaseString];
-                        
-                        // 如果 kCBAdvDataManufacturerData 包含 connectName，则去连接 (kCBAdvDataManufacturerData里面可能除了mac，还有其他的一些数据，所以用包好，不用等于)
-                        if ([hexString containsString:targetName])
-                        {
-                            peripheral.subName = connectModel.connectName;
-                            connectModel.peripheral = peripheral;
-                            
-                            [self connectPeripheral:peripheral];
-                            break;
-                        }
-                    }
-                }
-                
-            }
-        }
-    }
-    
-    
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(bluetoothManager:didDiscoverPeripheral:advertisementData:RSSI:)] )
-        {
-            [delegate bluetoothManager:self didDiscoverPeripheral:peripheral advertisementData:advertisementData RSSI:RSSI];
-        }
-    }
-}
-
-/**
- 连接到外设后调用
-
- @param central 中央管理者
- @param peripheral 外围设备
- */
-- (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)peripheral
-{
-    NSLog(@"连接外设成功：%@", peripheral);
-
-    
-    //扫描服务
-    [peripheral discoverServices:nil];
-    
-    //可扫描指定的服务，传nil代表扫描所有服务
-//    CBUUID * UUID = [CBUUID UUIDWithString:serviceUUID];
-//    [self.peripheral discoverServices:@[UUID]];
-    
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(bluetoothManager:didConnectPeripheral:)] )
-        {
-            [delegate bluetoothManager:self didConnectPeripheral:peripheral];
-        }
-    }
-}
-
-//连接外设失败
-- (void)centralManager:(CBCentralManager *)central didFailToConnectPeripheral:(CBPeripheral *)peripheral error:(nullable NSError *)error
-{
-    NSLog(@"连接外设失败：%@, error：%@", peripheral, error);
-    
-    
-    // 从数组中删除
-    FLYConnectModel * connectModel = [self getConnectModelForPeripheral:peripheral];
-    [self.connectModels removeObject:connectModel];
-    
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(bluetoothManager:didFailToConnectPeripheral:error:)] )
-        {
-            [delegate bluetoothManager:self didFailToConnectPeripheral:peripheral error:error];
-        }
-    }
-}
-
-//断开外设连接
-- (void)centralManager:(CBCentralManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(nullable NSError *)error
-{
-    
-    if ( error )
-    {
-        NSLog(@"外设连接意外断开：%@", peripheral);
-        NSLog(@"意外断开原因：%@", error);
-    
-        // 是否重连
-        if( self.reconnect )
-        {
-            [self connectPeripheral:peripheral];
-        }
-        else
-        {
-            // 从数组里删除 (上面重连的情况不要删)
-            FLYConnectModel * connectModel = [self getConnectModelForPeripheral:peripheral];
-            [self.connectModels removeObject:connectModel];
-        }
-    }
-    else
-    {
-        NSLog(@"外设连接断开成功：%@", peripheral);
-        
-        // 从数组里删除
-        FLYConnectModel * connectModel = [self getConnectModelForPeripheral:peripheral];
-        [self.connectModels removeObject:connectModel];
-    }
-    
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(bluetoothManager:didDisconnectPeripheral:error:)] )
-        {
-            [delegate bluetoothManager:self didDisconnectPeripheral:peripheral error:error];
-        }
-    }
-
-}
-
-
-
-#pragma mark - CBPeripheralDelegate 外设代理
-
-// 扫描到外设的服务时回调 (即使有多个服务，也只会回调一次，拿到的是数组，所有的服务都在里面)
-- (void)peripheral:(CBPeripheral *)peripheral didDiscoverServices:(nullable NSError *)error
-{
-    /*
-     Core Bluetooth 会缓存设备已发现的服务列表，如果服务列表内容有变动（例如设备固件更新导致服务发生改变），
-     需要去设置里关闭并重新打开蓝牙才能搜索到新的服务。
-     */
-    
-    
-    
-    if( error )
-    {
-        NSLog(@"%@ 扫描服务出错：%@", peripheral.subName ? peripheral.subName : peripheral.name, error);
-    }
-    
-    
-    for (CBService * service in peripheral.services )
-    {
-        NSLog(@"%@ 发现服务：%@",  peripheral.subName ? peripheral.subName : peripheral.name, service);
-        
-        //扫描特征
-        [peripheral discoverCharacteristics:nil forService:service];
-        
-//        // 可扫描指定的特征，传nil代表扫描所有特征
-//        CBUUID * UUID = [CBUUID UUIDWithString:characteristicUUID];
-//        [self.peripheral discoverCharacteristics:@[UUID] forService:service];
-    }
-    
-    
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(peripheral:didDiscoverServices:)] )
-        {
-            [delegate peripheral:peripheral didDiscoverServices:error];
-        }
-    }
-}
-
-// 扫描到服务的特征时回调  (一个服务只会回调一次，拿到的是数组，该服务的所有特征都在里面)
-- (void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(nullable NSError *)error
-{
-    if( error )
-    {
-        NSLog(@"%@ 扫描特征出错：%@", peripheral.subName ? peripheral.subName : peripheral.name, error);
-    }
-    
-    
-    for (CBCharacteristic * characteristic in service.characteristics )
-    {
-        NSLog(@"%@ 的 %@ 服务发现特征：%@", peripheral.subName ? peripheral.subName : peripheral.name, service.UUID.UUIDString, characteristic);
-        
-        /*
-         特征（CBCharacteristic）可以具有以下属性：
-
-         CBCharacteristicPropertiesBroadcast: 表示该特征可以被广播，即可以在广播包中发送特征值。
-         CBCharacteristicPropertiesRead: 表示该特征可以读取特征值。
-         CBCharacteristicPropertiesWriteWithoutResponse: 表示该特征可以通过写入操作来修改特征值，且无需响应。
-         CBCharacteristicPropertiesWrite: 表示该特征可以通过写入操作来修改特征值，并需要响应。
-         CBCharacteristicPropertiesNotify: 表示该特征可以发送通知，即可以通过通知来传递特征值的变化。
-         CBCharacteristicPropertiesIndicate: 表示该特征可以发送指示，即可以通过指示来传递特征值的变化。
-         CBCharacteristicPropertiesAuthenticatedSignedWrites: 表示该特征可以通过身份验证的签名方式进行写操作。
-         CBCharacteristicPropertiesExtendedProperties: 表示该特征具有扩展属性。
-         CBCharacteristicPropertiesNotifyEncryptionRequired: 表示通知特征值需要加密传输。
-         CBCharacteristicPropertiesIndicateEncryptionRequired: 表示指示特征值需要加密传输。
-         
-         这些属性不是所有蓝牙设备都支持的，具体支持的属性取决于蓝牙设备的设计和实现。在使用特征时，可以通过检查特征的属性来判断设备是否支持某些功能。
-         */
-
-
-        // CBCharacteristicProperties 是一个位域枚举（bitwise enum），这意味着每个枚举值都是一个独立的位。在内存中，这些枚举值可以组合在一起，形成一个表示多个属性的位掩码。
-
-         
-        // 特征具有写入属性
-        if (characteristic.properties & CBCharacteristicPropertyWrite)
-        {
-            NSLog(@"%@ 特征具有写入属性", characteristic.UUID);
-        }
-
-        // 特征具有无需响应的写入属性
-        if (characteristic.properties & CBCharacteristicPropertyWriteWithoutResponse)
-        {
-            NSLog(@"%@ 特征具有无需响应写入属性", characteristic.UUID);
-        }
-        
-        // 特征具有读取属性
-        if (characteristic.properties & CBCharacteristicPropertyRead)
-        {
-            NSLog(@"%@ 特征具有读取属性", characteristic.UUID);
-        }
-        
-        // 特征具有通知属性 （&是位运算中的按位与操作符）
-        if (characteristic.properties & CBCharacteristicPropertyNotify)
-        {
-             NSLog(@"%@ 特征具有通知属性", characteristic.UUID);
-
-            // 开启特征值的通知 (开启通知后，在 peripheral:didUpdateValueForCharacteristic:error: 代理中监听特征值的更新通知。)
-            [peripheral setNotifyValue:YES forCharacteristic:characteristic];
-        }
-    }
-    
-    
-    // 等上面代码都执行完了，在执行代理。防止外界在代理中实现了一些功能，又执行代理下面的代码，导致外界实现的功能被更改。
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(peripheral:didDiscoverCharacteristicsForService:error:)] )
-        {
-            [delegate peripheral:peripheral didDiscoverCharacteristicsForService:service error:error];
-        }
-    }
-    
-}
-
-// 特征值更新通知 或 读取特征值 时回调
-- (void)peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(nullable NSError *)error
-{
-    /* 通常情况下，通知、读、写操作会使用不同的特征来实现，但也有一些特殊情况下可能会使用同一个特征来实现通知、读、写功能。这主要取决于蓝牙设备的设计和实现。
-    
-        通过特征的 isNotifying 属性来判断是谁的回调，YES是通知的回调(setNotifyValue:forCharacteristic:)，NO是主动读取的回调(readValueForCharacteristic:)。
-        
-        如果一个特征开启了通知，再执行读的操作，isNotifying就会不准确，无法判断是读取还是通知的回调。(最好读的特征就别在开通知了，但也有例外，比如某个特征值存储的是电量，开启通知，电量变化会主动通知，但也可以主动去读取一下电量还剩多少。)
-     */
-    
-    NSString * name = peripheral.subName ? peripheral.subName : peripheral.name;
-    NSString * tips = characteristic.isNotifying ? @"更新通知" : @"读取结果";// 可能不准，原因见上面注释
-    id content = error ? error : characteristic.value;
-    
-    NSLog(@"%@ 的 %@ 特征值%@：%@", name, characteristic.UUID.UUIDString, tips, content);
-    
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(peripheral:didUpdateValueForCharacteristic:error:)] )
-        {
-            [delegate peripheral:peripheral didUpdateValueForCharacteristic:characteristic error:error];
-        }
-    }
-
-}
-
-//写入数据回调
-- (void)peripheral:(CBPeripheral *)peripheral didWriteValueForCharacteristic:(CBCharacteristic *)characteristic error:(nullable NSError *)error
-{
-    if ( error )
-    {
-        NSLog(@"%@ 写入失败：%@", peripheral.subName ? peripheral.subName : peripheral.name,  error);
-    }
-    else
-    {
-        NSLog(@"%@ 写入成功", peripheral.subName ? peripheral.subName : peripheral.name);
-    }
-    
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(peripheral:didWriteValueForCharacteristic:error:)] )
-        {
-            [delegate peripheral:peripheral didWriteValueForCharacteristic:characteristic error:error];
-        }
-    }
-    
-}
-
-// 当通知状态（即是否监听特征值的变化）发生变化时会被调用。这个方法可以用来处理成功或失败的通知订阅操作。
--(void)peripheral:(CBPeripheral *)peripheral didUpdateNotificationStateForCharacteristic:(CBCharacteristic *)characteristic error:(nullable NSError *)error
-{
-    if( error )
-    {
-        NSLog(@"%@ 订阅或取消订阅 %@ 特征通知出错：%@", peripheral.subName ? peripheral.subName : peripheral.name, characteristic.UUID.UUIDString, error);
-    }
-    else
-    {
-        if (characteristic.isNotifying) {
-            
-            NSLog(@"%@ 订阅 %@ 特征通知成功", peripheral.subName ? peripheral.subName : peripheral.name, characteristic.UUID.UUIDString);
-        }
-        else
-        {
-            NSLog(@"%@ 取消订阅 %@ 特征通知成功", peripheral.subName ? peripheral.subName : peripheral.name, characteristic.UUID.UUIDString);
-        }
-    }
-    
-    
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
-        if ( [delegate respondsToSelector:@selector(peripheral:didUpdateNotificationStateForCharacteristic:error:)] )
-        {
-            [delegate peripheral:peripheral didUpdateNotificationStateForCharacteristic:characteristic error:error];
-        }
-    }
-}
-
-
-
 #pragma mark - public methods
 
 /// 添加代理
@@ -610,23 +132,19 @@ static FLYBluetoothManager * _manager;
 /// - Parameters:
 ///   - name: 需要连接的 设备名字 或 广播里的某个值
 ///   - second: 超时时间 (设置为0时，则永不超时)(超时后会停止扫描)
-- (void)scanAndConnect:(NSString *)name timeout:(NSInteger)second
+- (void)scanAndConnect:(NSString *)name services:(nullable NSArray<FLYService *> *)services timeout:(NSInteger)second
 {
-    // 如果已经连接了，直接调用连接成功的代理，然后retun
+    // 如果已经连接了，直接调用连接成功的代理，然后return
     FLYConnectModel * connectModel = [self getConnectModelForDeviceName:name];
     if ( connectModel.peripheral.state == CBPeripheralStateConnected )
     {
-        // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-        NSHashTable * tempDelegates = self.delegates.copy;
-        
-        // 遍历所有代理，并执行回调
-        for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-        {
+        [self enumerateDelegatesUsingBlock:^(id<FLYBluetoothManagerDelegate> delegate) {
+            
             if ( [delegate respondsToSelector:@selector(bluetoothManager:didConnectPeripheral:)] )
             {
                 [delegate bluetoothManager:self didConnectPeripheral:connectModel.peripheral];
             }
-        }
+        }];
         return;
     }
     
@@ -653,6 +171,7 @@ static FLYBluetoothManager * _manager;
     // 如果还没连接，则创建 model 保存数据。
     FLYConnectModel * newModel = [[FLYConnectModel alloc] init];
     newModel.connectName = name;
+    newModel.services = services;
     newModel.second = second;
     newModel.timeoutBlock = ^(FLYConnectModel *model) {
         
@@ -717,7 +236,7 @@ static FLYBluetoothManager * _manager;
 }
 
 /// 连接外围设备
-- (void)connectPeripheral:(CBPeripheral *)peripheral
+- (void)connectPeripheral:(CBPeripheral *)peripheral services:(nullable NSArray<FLYService *> *)services
 {
     /*
       disconnected 外围设备没有连接到中央经理
@@ -732,17 +251,14 @@ static FLYBluetoothManager * _manager;
     // 如果已经连接了，直接调用连接成功的代理，然后retun
     if ( peripheral.state == CBPeripheralStateConnected )
     {
-        // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-        NSHashTable * tempDelegates = self.delegates.copy;
-        
-        // 遍历所有代理，并执行回调
-        for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-        {
+        [self enumerateDelegatesUsingBlock:^(id<FLYBluetoothManagerDelegate> delegate) {
+            
             if ( [delegate respondsToSelector:@selector(bluetoothManager:didConnectPeripheral:)] )
             {
                 [delegate bluetoothManager:self didConnectPeripheral:peripheral];
             }
-        }
+        }];
+        
         return;
     }
     
@@ -765,6 +281,7 @@ static FLYBluetoothManager * _manager;
         connectModel = [[FLYConnectModel alloc] init];
         //peripheral必须保存起来才能连接，不然会被释放。
         connectModel.peripheral = peripheral;
+        connectModel.services = services;
         [self.connectModels addObject:connectModel];
     }
     
@@ -773,7 +290,8 @@ static FLYBluetoothManager * _manager;
     //连接外围设备
     [self.centralManager connectPeripheral:peripheral options:nil];
     //设置外围设备的代理 -->一旦连接外设，将由外设来管理服务和特征的处理
-    peripheral.delegate = self;
+    // 因为代理在分类里实现，直接写 self 会警告未遵守代理，强转一下就没有警告了。
+    peripheral.delegate = (id<CBPeripheralDelegate>)self;
     
     
     
@@ -786,17 +304,13 @@ static FLYBluetoothManager * _manager;
     
     
     
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    // 遍历所有代理，并执行回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
+    [self enumerateDelegatesUsingBlock:^(id<FLYBluetoothManagerDelegate> delegate) {
+        
         if ( [delegate respondsToSelector:@selector(bluetoothManager:connectingPeripheral:)] )
         {
             [delegate bluetoothManager:self connectingPeripheral:peripheral];
         }
-    }
+    }];
 }
 
 /// 断开外围设备
@@ -850,7 +364,7 @@ static FLYBluetoothManager * _manager;
 }
 
 /// 读取特征的值
-- (void)readWithDeviceName:(NSString *)deviceName characteristicUUID:(NSString *)characteristicUUID
+- (void)readWithDeviceName:(NSString *)deviceName serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID
 {
     // 获取设备
     CBPeripheral * peripheral = [self getConnectModelForDeviceName:deviceName].peripheral;
@@ -864,25 +378,21 @@ static FLYBluetoothManager * _manager;
     
     
     // 获取特征
-    CBCharacteristic * characteristic = [self getCharacteristicsWithPeripheral:peripheral characteristicUUID:characteristicUUID];
+    CBCharacteristic * characteristic = [self getCharacteristicWithPeripheral:peripheral serviceUUID:serviceUUID characteristicUUID:characteristicUUID];
     
     if ( characteristic == nil )
     {
         NSLog(@"%@ 读取数据失败，未找到 %@ 特征", deviceName, characteristicUUID);
         
-        // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-        NSHashTable * tempDelegates = self.delegates.copy;
-        
-        // 遍历所有代理，并执行回调
-        for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-        {
+        [self enumerateDelegatesUsingBlock:^(id<FLYBluetoothManagerDelegate> delegate) {
+            
             if ( [delegate respondsToSelector:@selector(peripheral:didUpdateValueForCharacteristic:error:)] )
             {
                 NSString * domain = [NSString stringWithFormat:@"%@ 读取数据失败，未找到 %@ 特征", deviceName, characteristicUUID];
                 NSError * err = [NSError errorWithDomain:domain code:10086 userInfo:nil];
                 [delegate peripheral:peripheral didUpdateValueForCharacteristic:characteristic error:err];
             }
-        }
+        }];
         
         return;
     }
@@ -893,7 +403,7 @@ static FLYBluetoothManager * _manager;
 }
 
 /// 往特征里写入数据
-- (void)writeWithDeviceName:(NSString *)deviceName data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID
+- (void)writeWithDeviceName:(NSString *)deviceName data:(NSData *)data serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID
 {
     // 获取设备
     CBPeripheral * peripheral = [self getConnectModelForDeviceName:deviceName].peripheral;
@@ -907,25 +417,21 @@ static FLYBluetoothManager * _manager;
     
     
     // 获取特征
-    CBCharacteristic * characteristic = [self getCharacteristicsWithPeripheral:peripheral characteristicUUID:characteristicUUID];
-    
+    CBCharacteristic * characteristic = [self getCharacteristicWithPeripheral:peripheral serviceUUID:serviceUUID characteristicUUID:characteristicUUID];
+
     if ( characteristic == nil )
     {
         NSLog(@"%@ 写入数据失败，未找到 %@ 特征", deviceName, characteristicUUID);
         
-        // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-        NSHashTable * tempDelegates = self.delegates.copy;
-        
-        // 遍历所有代理，并执行回调
-        for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-        {
+        [self enumerateDelegatesUsingBlock:^(id<FLYBluetoothManagerDelegate> delegate) {
+            
             if ( [delegate respondsToSelector:@selector(peripheral:didWriteValueForCharacteristic:error:)] )
             {
                 NSString * domain = [NSString stringWithFormat:@"%@ 写入数据失败，未找到 %@ 特征", deviceName, characteristicUUID];
                 NSError * err = [NSError errorWithDomain:domain code:10086 userInfo:nil];
                 [delegate peripheral:peripheral didWriteValueForCharacteristic:characteristic error:err];
             }
-        }
+        }];
         
         return;
     }
@@ -954,23 +460,19 @@ static FLYBluetoothManager * _manager;
         
         /* 无需响应的写入，是没有成功和失败的回调的，这里手动调用写入成功的回调，让外界知道已经写完了。 外界的指令队列就可以执行下一条了*/
         
-        // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-        NSHashTable * tempDelegates = self.delegates.copy;
-        
-        // 遍历所有代理，并执行回调
-        for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-        {
+        [self enumerateDelegatesUsingBlock:^(id<FLYBluetoothManagerDelegate> delegate) {
+            
             if ( [delegate respondsToSelector:@selector(peripheral:didWriteValueForCharacteristic:error:)] )
             {
                 [delegate peripheral:peripheral didWriteValueForCharacteristic:characteristic error:nil];
             }
-        }
+        }];
     }
         
 }
 
 // 开启或关闭特征值的通知
-- (void)setNotifyValue:(BOOL)enabled forDeviceName:(NSString *)deviceName characteristicUUID:(NSString *)characteristicUUID
+- (void)setNotifyValue:(BOOL)enabled forDeviceName:(NSString *)deviceName serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID
 {
     // 获取设备
     CBPeripheral * peripheral = [self getConnectModelForDeviceName:deviceName].peripheral;
@@ -984,8 +486,8 @@ static FLYBluetoothManager * _manager;
     
     
     // 获取特征
-    CBCharacteristic * characteristic = [self getCharacteristicsWithPeripheral:peripheral characteristicUUID:characteristicUUID];
-    
+    CBCharacteristic * characteristic = [self getCharacteristicWithPeripheral:peripheral serviceUUID:serviceUUID characteristicUUID:characteristicUUID];
+
     // 特征的UUID都是开发时和硬件部门定好的，不存在找不到的情况，所以这里不需要搞失败的回调。
     if ( characteristic == nil )
     {
@@ -1024,101 +526,17 @@ static FLYBluetoothManager * _manager;
     }
     
     
-    // 外界可能在代理中移除代理，此时一边遍历一边删除会崩溃，搞个临时数组来遍历，外界删除就不会崩溃了。
-    NSHashTable * tempDelegates = self.delegates.copy;
-    
-    //超时回调
-    for ( id<FLYBluetoothManagerDelegate> delegate in tempDelegates )
-    {
+
+    [self enumerateDelegatesUsingBlock:^(id<FLYBluetoothManagerDelegate> delegate) {
+        
         if ( [delegate respondsToSelector:@selector(bluetoothManager:didTimeoutForDeviceName:)] )
         {
             [delegate bluetoothManager:self didTimeoutForDeviceName:connectModel.connectName];
         }
-    }
+    }];
     
-}
-
-
-
-#pragma mark - private methods
-
-// 根据 peripheral ，从数组中找到指定的 model
-- (FLYConnectModel *)getConnectModelForPeripheral:(CBPeripheral *)peripheral
-{
-    // 遍历数组，找到指定的model
-    for ( FLYConnectModel *connectModel in self.connectModels )
-    {
-        if ( connectModel.peripheral == peripheral )
-        {
-            return connectModel;
-        }
-    }
-    
-    return nil;
-}
-
-// 根据 deviceName ，从数组中找到指定的 model
-- (FLYConnectModel *)getConnectModelForDeviceName:(NSString *)deviceName
-{
-    // 遍历数组，找到指定的model
-    for ( FLYConnectModel *connectModel in self.connectModels )
-    {
-        if ( [connectModel.connectName isEqualToString:deviceName] )
-        {
-            return connectModel;
-        }
-    }
-    
-    return nil;
-}
-
-// 获取指定的特征
-- (CBCharacteristic *)getCharacteristicsWithPeripheral:(CBPeripheral *)peripheral characteristicUUID:(NSString *)characteristicUUID
-{
-    // 遍历外设中的服务 -> 遍历服务中的特征 -> 找到指定特征
-    for (CBService * service in peripheral.services)
-    {
-        for (CBCharacteristic * characteristic in service.characteristics)
-        {
-            if ( [characteristic.UUID.UUIDString isEqualToString:characteristicUUID] )
-            {
-                return characteristic;
-            }
-        }
-    }
-    
-    return nil;
-}
-
-/// 数组里是否存在还未开始连接的设备
-- (BOOL)isUnconnected
-{
-    // 遍历所有的模型，如果没有peripheral，说明还没开始连接 (只要开始连接了，就能停止扫描了，不用等连上)
-    for (FLYConnectModel * connectModel in self.connectModels)
-    {
-        if( connectModel.peripheral == nil )
-        {
-            return YES;
-        }
-    }
-    
-    return NO;
-}
-
-
-
-#pragma mark - setters and getters
-
--(NSMutableArray<FLYConnectModel *> *)connectModels
-{
-    if ( _connectModels == nil )
-    {
-        _connectModels = [NSMutableArray array];
-    }
-    return _connectModels;
 }
 
 
 @end
-
 

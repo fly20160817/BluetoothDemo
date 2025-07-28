@@ -85,7 +85,7 @@
     CBPeripheral * peripheral = self.peripheralArray[indexPath.row];
     self.peripheral = peripheral;
     
-    [[FLYBluetoothManager sharedManager] connectPeripheral:peripheral];
+    [[FLYBluetoothManager sharedManager] connectPeripheral:peripheral services:nil];
 }
 
 
@@ -116,5 +116,6 @@
 
 
 @end
+
 
 

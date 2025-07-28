@@ -64,22 +64,26 @@ typedef void(^BLEUpdateValueBlock)(CBPeripheral * peripheral, CBCharacteristic *
 /// 往特征里写入数据
 /// - Parameters:
 ///   - name: 设备名字 或 广播里的某个值
+///   - services: 需要扫描的服务和特征 (传nil则是扫描所以服务特征)
 ///   - data: 数据
+///   - serviceUUID: 服务的UUID
 ///   - characteristicUUID: 特征的UUID
 ///   - success: 成功的回调
 ///   - failure: 失败的回调
 ///   - progress: 进度 (扫描中、连接中、连接成功、断开连接)
-- (void)bluetoothWriteWithDeviceName:(NSString *)name data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID success:(nullable void (^)(void))success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress;
+- (void)bluetoothWriteWithDeviceName:(NSString *)name services:(nullable NSArray<FLYService *> *)services data:(NSData *)data serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID success:(nullable void (^)(void))success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress;
 
 
 /// 读取特征的值
 /// - Parameters:
 ///   - name: 设备名字 或 Mac地址 (如果是用Mac，需要蓝牙设备把Mac地址放到广播中)
+///   - services: 需要扫描的服务和特征 (传nil则是扫描所以服务特征)
+///   - serviceUUID: 服务的UUID
 ///   - characteristicUUID: 特征的UUID
 ///   - success: 成功的回调
 ///   - failure: 失败的回调
 ///   - progress: 进度 (扫描中、连接中、连接成功、断开连接)
-- (void)bluetoothReadWithDeviceName:(NSString *)name characteristicUUID:(NSString *)characteristicUUID success:(nullable BLESuccessBlock)success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress;
+- (void)bluetoothReadWithDeviceName:(NSString *)name services:(nullable NSArray<FLYService *> *)services serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID success:(nullable BLESuccessBlock)success failure:(nullable BLEFailureBlock)failure progress:(nullable BLEProgressBlock)progress;
 
 
 /// 添加一个特征值更新的回调

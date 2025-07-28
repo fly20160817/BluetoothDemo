@@ -29,6 +29,7 @@
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CoreBluetooth.h>
 #import "CBPeripheral+FLYExtension.h"
+#import "FLYService.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -79,7 +80,7 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 
-@interface FLYBluetoothManager : NSObject
+@interface FLYBluetoothManager : NSObject 
 
 // 蓝牙状态
 @property(nonatomic, assign, readonly) CBManagerState state;
@@ -102,8 +103,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 扫描并连接设备
 /// - Parameters:
 ///   - name: 需要连接的 设备名字 或 广播里的某个值
+///   - services: 需要扫描的服务和特征 (传nil则是扫描所以服务特征)(有的设备服务和特征太多了，全部扫描完要2、3秒，扫描指定的会快很多)
 ///   - second: 超时时间 (设置为0时，则永不超时)(超时后会停止扫描)
-- (void)scanAndConnect:(NSString *)name timeout:(NSInteger)second;
+- (void)scanAndConnect:(NSString *)name services:(nullable NSArray<FLYService *> *)services timeout:(NSInteger)second;
 
 
 /// 开始扫描周边设备
@@ -115,7 +117,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// 连接外围设备 (调用此方法后，不用手动调用停止扫描。内部会在合适的地方自动调用停止扫描)
 /// - Parameters:
 ///   - peripheral: 外设对象
-- (void)connectPeripheral:(CBPeripheral *)peripheral;
+///   - services: 需要扫描的服务和特征 (传nil则是扫描所以服务特征)(有的设备服务和特征太多了，全部扫描完要2、3秒，扫描指定的会快很多)
+- (void)connectPeripheral:(CBPeripheral *)peripheral services:(nullable NSArray<FLYService *> *)services;
 
 /// 断开外围设备 (如果此设备还未连接上(还在扫描中)，执行此方法就不会再扫描连接它了)
 - (void)disconnectPeripheral:(NSString *)deviceName;
@@ -126,22 +129,25 @@ NS_ASSUME_NONNULL_BEGIN
 /// 读取特征的值
 /// - Parameters:
 ///   - deviceName: 外设名称 (因为支持同时连接多个蓝牙设备，所以要指定读取哪个设备)
+///   - serviceUUID: 服务的UUID
 ///   - characteristicUUID: 特征的UUID
-- (void)readWithDeviceName:(NSString *)deviceName characteristicUUID:(NSString *)characteristicUUID;
+- (void)readWithDeviceName:(NSString *)deviceName serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID;
 
 /// 往特征里写入数据
 /// - Parameters:
 ///   - deviceName: 外设名称 (因为支持同时连接多个蓝牙设备，所以要指定写入哪个设备)
 ///   - data: 数据
+///   - serviceUUID: 服务的UUID
 ///   - characteristicUUID: 特征的UUID
-- (void)writeWithDeviceName:(NSString *)deviceName data:(NSData *)data characteristicUUID:(NSString *)characteristicUUID;
+- (void)writeWithDeviceName:(NSString *)deviceName data:(NSData *)data serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID;
 
 /// 开启/关闭特征值的通知
 /// - Parameters:
 ///   - enabled: YES 开启   NO 关闭
 ///   - deviceName: 外设名称
+///   - serviceUUID: 服务的UUID
 ///   - characteristicUUID: 特征的UUID
-- (void)setNotifyValue:(BOOL)enabled forDeviceName:(NSString *)deviceName characteristicUUID:(NSString *)characteristicUUID;
+- (void)setNotifyValue:(BOOL)enabled forDeviceName:(NSString *)deviceName serviceUUID:(NSString *)serviceUUID characteristicUUID:(NSString *)characteristicUUID;
 
 @end
 
