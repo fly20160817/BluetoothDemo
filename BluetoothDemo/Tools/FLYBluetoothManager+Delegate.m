@@ -8,7 +8,6 @@
 #import "FLYBluetoothManager+Delegate.h"
 #import "FLYConnectModel.h"
 #import "FLYBluetoothManager+Helper.h"
-#import "BluetoothDemo-Bridging-Header.h"
 
 @interface FLYBluetoothManager ()
 
