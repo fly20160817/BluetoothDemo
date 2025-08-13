@@ -519,6 +519,23 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     if (self.deviceCurrentCommands[deviceName] != nil)
     {
         NSLog(@"设备 %@ 当前已有命令在执行，新命令已加入等待队列", deviceName);
+        
+        NSMutableArray<FLYCommand *> *queue = self.deviceCommandQueues[deviceName];
+        [queue enumerateObjectsUsingBlock:^(FLYCommand * _Nonnull cmd, NSUInteger idx, BOOL * _Nonnull stop) {
+            if ( idx == 0 )
+            {
+                NSLog(@"队列[%lu] -> %@ (正在执行)", (unsigned long)idx, cmd.data);
+            }
+            else if ( idx == queue.count - 1 )
+            {
+                NSLog(@"队列[%lu] -> %@ (新命令)", (unsigned long)idx, cmd.data);
+            }
+            else
+            {
+                NSLog(@"队列[%lu] -> %@", (unsigned long)idx, cmd.data);
+            }
+        }];
+        
         return;
     }
     
@@ -621,10 +638,6 @@ typedef NS_ENUM(NSInteger, FLYCommandType) {
     NSMutableArray<FLYCommand *> *queue = self.deviceCommandQueues[deviceName];
     if (queue.count > 0)
     {
-        // 取队列第一个命令作为当前命令
-        FLYCommand *nextCommand = queue.firstObject;
-        self.deviceCurrentCommands[deviceName] = nextCommand;
-        
         // 执行命令
         [self executeCommandForDeviceName:deviceName];
     }
