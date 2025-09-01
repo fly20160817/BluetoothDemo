@@ -186,7 +186,8 @@
     
     for (FLYService *tempService in connectModel.services)
     {
-        if ([tempService.serviceUUID isEqualToString:service.UUID.UUIDString])
+        // 使用 CBUUID 对象比较，避免短 UUID 和完整 UUID 字符串在格式上不一致而导致比较失败
+        if ( [[CBUUID UUIDWithString:tempService.serviceUUID] isEqual:service.UUID] )
         {
             return tempService;
         }
